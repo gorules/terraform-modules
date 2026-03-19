@@ -1,0 +1,178 @@
+# GoRules Full Stack Example - terraform.tfvars
+#
+# Copy this file to terraform.tfvars and update the values for your environment.
+# Required values are marked with (REQUIRED).
+
+# --- Required Variables ---
+
+# (REQUIRED) Project name - used for resource naming
+project_name = "gorules"
+
+# (REQUIRED) Environment name
+environment = "prod"
+
+# (REQUIRED) AWS region
+region = "us-east-1"
+
+# (REQUIRED) ARN of Secrets Manager secret containing your GoRules license key
+# Create this secret before running terraform:
+#   aws secretsmanager create-secret --name gorules-license-key --secret-string "YOUR_LICENSE_KEY"
+brms_license_key_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:gorules-license-key-AbCdEf"
+
+# --- Tags ---
+
+tags = {
+  Owner       = "platform-team"
+  CostCenter  = "engineering"
+  Application = "gorules"
+}
+
+# --- VPC Configuration ---
+
+# CIDR block for the VPC
+vpc_cidr = "10.0.0.0/16"
+
+# NAT Gateway mode: "single" to save costs, "ha" for high availability
+nat_gateway_mode = "single"
+
+# Enable VPC endpoints to reduce NAT Gateway traffic costs
+enable_vpc_endpoints = false
+
+# --- Storage Configuration ---
+
+# S3 authentication: "iam" (recommended) or "secrets"
+storage_auth = "iam"
+
+# --- Database Configuration ---
+
+# PostgreSQL engine version
+database_engine_version = "17.4"
+
+# Number of Aurora instances (1 for dev, 2+ for prod HA)
+database_instance_count = 1
+
+# Aurora Serverless v2 capacity (ACUs)
+database_min_capacity = 0.5
+database_max_capacity = 4
+
+# Auto-pause after inactivity (seconds, null to disable)
+# IMPORTANT: Requires database_min_capacity = 0 to work
+database_seconds_until_auto_pause = null
+
+# Deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+database_deletion_protection = false
+
+# Backup retention period in days
+database_backup_retention_period = 7
+
+# --- BRMS Configuration ---
+
+# ALB deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+brms_alb_deletion_protection = false
+
+# Docker image
+brms_image = "gorules/brms:latest"
+
+# Fargate task size
+brms_cpu    = 512
+brms_memory = 1024
+
+# Auto-scaling configuration
+brms_min_count = 1
+brms_max_count = 4
+
+# (REQUIRED) Custom domain for BRMS - HTTPS is required
+brms_domain = "brms.example.com"
+
+# (REQUIRED) Certificate configuration - BRMS requires HTTPS
+# You MUST configure exactly ONE of the following two options:
+#
+# Option 1: Auto-create certificate with Route53 (recommended)
+# Provide your Route53 hosted zone ID - certificate will be created and validated automatically
+brms_route53_zone_id = "Z1234567890ABC"
+#
+# Option 2: Use existing ACM certificate
+# Provide the ARN of an existing validated ACM certificate (comment out route53_zone_id above)
+# brms_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+# CIDR blocks allowed to access BRMS
+# For production, restrict to your corporate network
+brms_allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# Additional environment variables (optional)
+brms_env = []
+
+# Additional secrets (optional)
+# brms_secrets = [
+#   { name = "SSO_OAUTH2_CLIENT_SECRET", valueFrom = "arn:aws:secretsmanager:us-east-1:123456789012:secret:sso-client-secret" }
+# ]
+brms_secrets = []
+
+# --- AI/LLM Configuration (Optional) ---
+# Enables AI assistant in BRMS for building rules
+# See https://docs.gorules.io/developers/deployment/brms/ai-setup
+
+# brms_ai_enabled            = true
+# brms_ai_provider           = "anthropic"
+# brms_ai_model              = "claude-sonnet-4-6"
+# brms_ai_api_key_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:gorules-llm-api-key-AbCdEf"
+# brms_ai_temperature        = 0.4
+# brms_ai_thinking_level     = "medium"
+
+# --- Agent Configuration ---
+
+# ALB deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+agent_alb_deletion_protection = false
+
+# Docker image
+agent_image = "gorules/agent:latest"
+
+# Fargate task size
+agent_cpu    = 256
+agent_memory = 512
+
+# Auto-scaling configuration
+agent_min_count = 1
+agent_max_count = 10
+
+# Custom domain (optional) - enables HTTPS when provided with certificate
+# If not set, Agent runs HTTP-only on ALB DNS
+# agent_domain = "agent.example.com"
+
+# Certificate configuration (only needed if domain is set) - choose ONE:
+#
+# Option 1: Auto-create certificate with Route53
+# agent_route53_zone_id = "Z1234567890ABC"
+#
+# Option 2: Use existing ACM certificate
+# agent_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+# CIDR blocks allowed to access Agent
+# For production, restrict to your application servers
+agent_allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# Additional environment variables (optional)
+agent_env = [
+  { name = "POLL_INTERVAL", value = "5000" }
+]
+
+# Additional secrets (optional)
+agent_secrets = []
+
+# --- Cross-Account External Buckets (Optional) ---
+
+# For multi-account deployments, BRMS can publish rules to S3 buckets in other AWS accounts.
+# Add bucket details here after deploying agent-only stacks in other accounts.
+# brms_external_buckets = [
+#   {
+#     arn  = "arn:aws:s3:::gorules-staging-rules-abc12345"
+#     name = "gorules-staging-rules-abc12345"
+#   },
+#   {
+#     arn  = "arn:aws:s3:::gorules-prod-rules-def67890"
+#     name = "gorules-prod-rules-def67890"
+#   }
+# ]

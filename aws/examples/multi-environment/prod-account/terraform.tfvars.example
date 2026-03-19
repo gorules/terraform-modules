@@ -1,0 +1,63 @@
+# GoRules Multi-Environment Prod Account - terraform.tfvars
+#
+# Copy this file to terraform.tfvars and update the values for your environment.
+# Required values are marked with (REQUIRED).
+
+################################################################################
+# Required Variables
+################################################################################
+
+# (REQUIRED) Project name - used for resource naming
+project_name = "gorules"
+
+# (REQUIRED) AWS region
+region = "us-east-1"
+
+# (REQUIRED) Management account ID (where BRMS runs)
+# This grants cross-account write access to the S3 bucket
+management_account_id = "123456789012"
+
+################################################################################
+# Optional Variables - Tags
+################################################################################
+
+tags = {
+  Owner       = "platform-team"
+  CostCenter  = "engineering"
+  Application = "gorules"
+}
+
+################################################################################
+# Agent Configuration
+################################################################################
+
+# ALB deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+agent_alb_deletion_protection = false
+
+# Docker image
+agent_image = "gorules/agent:latest"
+
+# Fargate task size (higher resources for production)
+agent_cpu    = 512
+agent_memory = 1024
+
+# Auto-scaling configuration
+agent_min_count = 2
+agent_max_count = 10
+
+# Custom domain (optional) - enables HTTPS when provided with certificate
+# Recommended for production
+# agent_domain = "agent.example.com"
+
+# Certificate configuration (only needed if domain is set) - choose ONE:
+#
+# Option 1: Auto-create certificate with Route53
+# agent_route53_zone_id = "Z1234567890ABC"
+#
+# Option 2: Use existing ACM certificate
+# agent_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+# CIDR blocks allowed to access Agent
+# For production, consider restricting to your application servers
+agent_allowed_cidr_blocks = ["0.0.0.0/0"]
