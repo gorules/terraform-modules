@@ -1,0 +1,169 @@
+# GoRules Existing VPC Example - terraform.tfvars
+#
+# Copy this file to terraform.tfvars and update the values for your environment.
+# Required values are marked with (REQUIRED).
+
+# --- Required Variables ---
+
+# (REQUIRED) Project name - used for resource naming
+project_name = "gorules"
+
+# (REQUIRED) Environment name
+environment = "prod"
+
+# (REQUIRED) AWS region
+region = "us-east-1"
+
+# (REQUIRED) ARN of Secrets Manager secret containing your GoRules license key
+brms_license_key_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:gorules-license-key-AbCdEf"
+
+# --- Existing VPC Configuration (REQUIRED) ---
+
+# (REQUIRED) Your existing VPC ID
+vpc_id = "vpc-0123456789abcdef0"
+
+# (REQUIRED) Private subnet IDs (at least 2, in different AZs)
+# These subnets must have:
+# - Route to NAT Gateway for internet access
+# - DNS resolution enabled
+private_subnet_ids = [
+  "subnet-private-1a",
+  "subnet-private-1b"
+]
+
+# (REQUIRED) Public subnet IDs (at least 2, in different AZs)
+# These subnets must have:
+# - Route to Internet Gateway
+# - Auto-assign public IP enabled (for ALB)
+public_subnet_ids = [
+  "subnet-public-1a",
+  "subnet-public-1b"
+]
+
+# --- Tags ---
+
+tags = {
+  Owner       = "platform-team"
+  CostCenter  = "engineering"
+  Application = "gorules"
+}
+
+# --- Storage Configuration ---
+
+# S3 authentication: "iam" (recommended) or "secrets"
+storage_auth = "iam"
+
+# --- Database Configuration ---
+
+# PostgreSQL engine version
+database_engine_version = "17.4"
+
+# Number of Aurora instances (1 for dev, 2+ for production HA)
+database_instance_count = 1
+
+# Aurora Serverless v2 capacity (ACUs)
+database_min_capacity = 0.5
+database_max_capacity = 4
+
+# Auto-pause after inactivity (seconds, null to disable)
+# IMPORTANT: Requires database_min_capacity = 0 to work
+database_seconds_until_auto_pause = null
+
+# Deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+database_deletion_protection = false
+
+# Backup retention period in days
+database_backup_retention_period = 7
+
+# --- BRMS Configuration ---
+
+# ALB deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+brms_alb_deletion_protection = false
+
+# Docker image
+brms_image = "gorules/brms:latest"
+
+# Fargate task size
+brms_cpu    = 512
+brms_memory = 1024
+
+# Auto-scaling configuration
+brms_min_count = 1
+brms_max_count = 4
+
+# (REQUIRED) Custom domain for BRMS - BRMS requires HTTPS to function
+brms_domain = "brms.example.com"
+
+# Certificate configuration - choose ONE:
+#
+# Option 1: Auto-create certificate with Route53 (recommended)
+brms_route53_zone_id = "Z1234567890ABC"
+#
+# Option 2: Use existing ACM certificate (comment out route53_zone_id above)
+# brms_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+# CIDR blocks allowed to access BRMS
+# Consider restricting to your corporate network or VPC CIDR
+brms_allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# Additional environment variables (optional)
+brms_env = []
+
+# Additional secrets (optional)
+brms_secrets = []
+
+# --- Agent Configuration ---
+
+# ALB deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+agent_alb_deletion_protection = false
+
+# Docker image
+agent_image = "gorules/agent:latest"
+
+# Fargate task size
+agent_cpu    = 256
+agent_memory = 512
+
+# Auto-scaling configuration
+agent_min_count = 1
+agent_max_count = 10
+
+# Custom domain (optional) - enables HTTPS when provided with certificate
+# agent_domain = "agent.example.com"
+
+# Certificate configuration (only needed if domain is set) - choose ONE:
+#
+# Option 1: Auto-create certificate with Route53
+# agent_route53_zone_id = "Z1234567890ABC"
+#
+# Option 2: Use existing ACM certificate
+# agent_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+# CIDR blocks allowed to access Agent
+agent_allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# Additional environment variables
+agent_env = [
+  { name = "POLL_INTERVAL", value = "5000" }
+]
+
+# Additional secrets (optional)
+agent_secrets = []
+
+# --- Cross-Account External Buckets (Optional) ---
+
+# For multi-account deployments, BRMS can publish rules to S3 buckets in other AWS accounts.
+# Add bucket details here after deploying agent-only stacks in other accounts.
+# brms_external_buckets = [
+#   {
+#     arn  = "arn:aws:s3:::gorules-staging-rules-abc12345"
+#     name = "gorules-staging-rules-abc12345"
+#   },
+#   {
+#     arn  = "arn:aws:s3:::gorules-prod-rules-def67890"
+#     name = "gorules-prod-rules-def67890"
+#   }
+# ]

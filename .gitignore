@@ -1,0 +1,15 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Lambda build artifacts (exclude pre-built layers)
+*.zip
+!aws/modules/database/layers/psycopg_layer.zip
+
+# OS
+.DS_Store

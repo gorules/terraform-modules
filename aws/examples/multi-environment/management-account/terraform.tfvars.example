@@ -1,0 +1,120 @@
+# GoRules Multi-Environment Management Account - terraform.tfvars
+#
+# Copy this file to terraform.tfvars and update the values for your environment.
+# Required values are marked with (REQUIRED).
+
+# --- Required Variables ---
+
+# (REQUIRED) Project name - used for resource naming
+project_name = "gorules"
+
+# Environment name for resource naming
+environment = "dev"
+
+# (REQUIRED) AWS region
+region = "us-east-1"
+
+# (REQUIRED) ARN of Secrets Manager secret containing your GoRules license key
+# Create this secret before running terraform:
+#   aws secretsmanager create-secret --name gorules-license-key --secret-string "YOUR_LICENSE_KEY"
+brms_license_key_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:gorules-license-key-AbCdEf"
+
+# --- Tags ---
+
+tags = {
+  Owner       = "platform-team"
+  CostCenter  = "engineering"
+  Application = "gorules"
+}
+
+# --- Database Configuration ---
+
+# Aurora Serverless v2 capacity (ACUs)
+database_min_capacity = 0.5
+database_max_capacity = 4
+
+# Deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+database_deletion_protection = false
+
+# --- BRMS Configuration ---
+
+# ALB deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+brms_alb_deletion_protection = false
+
+# Docker image
+brms_image = "gorules/brms:latest"
+
+# Fargate task size
+brms_cpu    = 512
+brms_memory = 1024
+
+# Auto-scaling configuration
+brms_min_count = 1
+brms_max_count = 2
+
+# (REQUIRED) Custom domain for BRMS - HTTPS is required
+brms_domain = "brms.example.com"
+
+# (REQUIRED) Certificate configuration - BRMS requires HTTPS
+# You MUST configure exactly ONE of the following two options:
+#
+# Option 1: Auto-create certificate with Route53 (recommended)
+# Provide your Route53 hosted zone ID - certificate will be created and validated automatically
+brms_route53_zone_id = "Z1234567890ABC"
+#
+# Option 2: Use existing ACM certificate
+# Provide the ARN of an existing validated ACM certificate (comment out route53_zone_id above)
+# brms_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+# CIDR blocks allowed to access BRMS
+# For production, restrict to your corporate network
+brms_allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# --- Agent Configuration ---
+
+# ALB deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+agent_alb_deletion_protection = false
+
+# Docker image
+agent_image = "gorules/agent:latest"
+
+# Fargate task size
+agent_cpu    = 256
+agent_memory = 512
+
+# Auto-scaling configuration
+agent_min_count = 1
+agent_max_count = 10
+
+# Custom domain (optional) - enables HTTPS when provided with certificate
+# If not set, Agent runs HTTP-only on ALB DNS
+# agent_domain = "agent-dev.example.com"
+
+# Certificate configuration (only needed if domain is set) - choose ONE:
+#
+# Option 1: Auto-create certificate with Route53
+# agent_route53_zone_id = "Z1234567890ABC"
+#
+# Option 2: Use existing ACM certificate
+# agent_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+# CIDR blocks allowed to access Agent
+agent_allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# --- Cross-Account External Buckets ---
+
+# After deploying Staging and Prod accounts, add their bucket details here
+# to allow BRMS to publish rules to those environments:
+external_buckets = [
+  # {
+  #   arn  = "arn:aws:s3:::gorules-staging-rules-abc12345"
+  #   name = "gorules-staging-rules-abc12345"
+  # },
+  # {
+  #   arn  = "arn:aws:s3:::gorules-prod-rules-def67890"
+  #   name = "gorules-prod-rules-def67890"
+  # }
+]

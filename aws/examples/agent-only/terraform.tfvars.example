@@ -1,0 +1,93 @@
+# GoRules Agent-Only Example - terraform.tfvars
+#
+# Copy this file to terraform.tfvars and update the values for your environment.
+# Required values are marked with (REQUIRED).
+
+# --- Required Variables ---
+
+# (REQUIRED) Project name - used for resource naming
+project_name = "gorules"
+
+# (REQUIRED) Environment name
+environment = "prod"
+
+# (REQUIRED) AWS region
+region = "us-east-1"
+
+# --- Tags ---
+
+tags = {
+  Owner       = "platform-team"
+  CostCenter  = "engineering"
+  Application = "gorules-agent"
+}
+
+# --- VPC Configuration ---
+
+# CIDR block for the VPC
+vpc_cidr = "10.0.0.0/16"
+
+# NAT Gateway mode: "single" for cost savings, "ha" for high availability
+nat_gateway_mode = "single"
+
+# Enable VPC endpoints to reduce NAT Gateway traffic costs
+enable_vpc_endpoints = false
+
+# --- Storage Configuration ---
+
+# Option 1: Create a new S3 bucket (default)
+create_bucket = true
+
+# Option 2: Use an existing S3 bucket
+# Uncomment these and set create_bucket = false to use an existing bucket
+# create_bucket        = false
+# existing_bucket_arn  = "arn:aws:s3:::my-existing-gorules-bucket"
+# existing_bucket_name = "my-existing-gorules-bucket"
+
+# S3 authentication: "iam" (recommended) or "secrets"
+storage_auth = "iam"
+
+# Cross-account write access (for multi-account deployments)
+# Allow BRMS in another account to publish rules to this bucket
+# Use IAM role ARNs for least-privilege, or account IDs for broader access
+# cross_account_write_principals = ["arn:aws:iam::111111111111:role/gorules-dev-brms-task"]
+# cross_account_write_principals = ["111111111111"]
+
+# --- Agent Configuration ---
+
+# ALB deletion protection - set to false for testing/development
+# WARNING: Set to true for production deployments to prevent accidental deletion
+agent_alb_deletion_protection = false
+
+# Docker image
+agent_image = "gorules/agent:latest"
+
+# Fargate task size (Agent is lightweight)
+agent_cpu    = 256
+agent_memory = 512
+
+# Auto-scaling configuration
+# Agent is stateless and can scale aggressively for high-throughput workloads
+agent_min_count = 2
+agent_max_count = 20
+
+# Custom domain (optional) - requires certificate_arn
+# agent_domain = "agent.example.com"
+
+# ACM certificate ARN for HTTPS (optional)
+# agent_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+# CIDR blocks allowed to access Agent
+# For production, restrict to your application servers or VPC CIDR
+agent_allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# Additional environment variables
+agent_env = [
+  { name = "POLL_INTERVAL", value = "5000" }
+]
+
+# Additional secrets (optional)
+# agent_secrets = [
+#   { name = "RELEASE_ZIP_PASSWORD", valueFrom = "arn:aws:secretsmanager:us-east-1:123456789012:secret:release-password" }
+# ]
+agent_secrets = []
