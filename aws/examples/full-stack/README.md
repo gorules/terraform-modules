@@ -244,7 +244,7 @@ aws secretsmanager create-secret \
 | `brms_ai_provider` | `"anthropic"` | LLM provider: `openai`, `anthropic`, `google`, `amazon-bedrock`, `azure-openai` |
 | `brms_ai_model` | `"claude-sonnet-4-6"` | Model name |
 | `brms_ai_api_key_secret_arn` | `null` | Secrets Manager ARN for the API key |
-| `brms_ai_temperature` | `0.4` | Sampling temperature (0–2) |
+| `brms_ai_temperature` | `0.4` | Sampling temperature (0 to 2) |
 | `brms_ai_thinking_level` | `"medium"` | Thinking level: `high`, `medium` |
 
 See the [AI setup guide](https://docs.gorules.io/developers/deployment/brms/ai-setup) and [root module docs](../../README.md#aillm-configuration) for all options.
