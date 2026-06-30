@@ -25,10 +25,7 @@ locals {
     (var.agent != null ? !var.agent.alb_internal : false)
   )
 
-  # Interface VPC endpoints to add beyond the base set when the module creates a
-  # VPC. KMS is needed when BRMS uses the aws-kms secrets provider;
-  # bedrock-runtime when BRMS AI uses Amazon Bedrock. Users can add more (e.g.
-  # ssmmessages for ECS Exec) via vpc.additional_vpc_endpoints.
+  # Extra interface VPC endpoints beyond the base set: kms for the aws-kms secrets provider, bedrock-runtime for Bedrock AI.
   vpc_additional_endpoints = distinct(concat(
     (var.brms != null && var.brms.secrets_provider.type == "aws-kms") ? ["kms"] : [],
     (var.brms != null && var.brms.ai != null ? var.brms.ai.provider == "amazon-bedrock" : false) ? ["bedrock-runtime"] : [],

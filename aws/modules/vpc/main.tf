@@ -6,20 +6,14 @@ locals {
   nat_enabled       = var.nat_gateway_mode != "none"
   nat_gateway_count = local.nat_enabled ? (var.nat_gateway_mode == "ha" ? local.az_count : 1) : 0
 
-  # Private route tables always exist (independent of NAT) so the S3 gateway
-  # endpoint has a route table to attach to and private subnets get explicit
-  # associations.
+  # Private route tables always exist (independent of NAT) for the S3 gateway endpoint and subnet associations.
   private_rt_count = var.nat_gateway_mode == "ha" ? local.az_count : 1
 
-  # Public subnets (and the internet gateway) exist when an internet-facing ALB
-  # needs them, or to host a NAT gateway. With nat_gateway_mode = "none" and no
-  # internet-facing ALB the VPC is fully private (no public subnets, internet
-  # gateway, NAT gateway or EIP), which satisfies policies that forbid creating
-  # any resource in a public subnet.
+  # Public subnets and the IGW exist only for an internet-facing ALB or to host a NAT.
+  # With nat_gateway_mode = "none" and no public ALB, the VPC is fully private.
   create_public = var.create_public_subnets || local.nat_enabled
 
-  # With no NAT gateway, VPC endpoints are the only path to AWS services, so
-  # create them automatically in that case.
+  # With no NAT, VPC endpoints are the only path to AWS services, so create them automatically.
   create_endpoints = var.enable_vpc_endpoints || !local.nat_enabled
 
   common_tags = merge(var.tags, {

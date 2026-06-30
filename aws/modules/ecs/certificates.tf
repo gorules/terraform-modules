@@ -2,8 +2,7 @@ locals {
   create_brms_certificate  = local.create_brms && var.brms.route53_zone_id != null && !var.brms.alb_http_only
   create_agent_certificate = local.create_agent && var.agent.domain != null && var.agent.route53_zone_id != null && !var.agent.alb_http_only
 
-  # TLS is terminated on the ALB unless alb_http_only is set, in which case a
-  # trusted edge such as CloudFront terminates HTTPS and the ALB serves HTTP.
+  # TLS terminates on the ALB unless alb_http_only is set (then a trusted edge such as CloudFront terminates it).
   brms_use_tls  = var.brms != null ? !var.brms.alb_http_only : false
   agent_use_tls = var.agent != null ? (!var.agent.alb_http_only && local.agent_certificate_arn != null) : false
 

@@ -1,7 +1,5 @@
 locals {
-  # Base interface endpoints needed for ECS Fargate to pull images from ECR,
-  # ship logs, and read secrets without a NAT gateway. The S3 gateway endpoint
-  # (below) is also required because ECR stores image layers in S3.
+  # Interface endpoints so ECS Fargate can reach ECR, logs and secrets without a NAT (plus the S3 gateway endpoint below for ECR image layers).
   base_interface_endpoints = ["ecr.api", "ecr.dkr", "logs", "secretsmanager", "sts"]
 
   interface_endpoints = local.create_endpoints ? toset(concat(
@@ -58,8 +56,7 @@ resource "aws_vpc_endpoint" "interface" {
   })
 }
 
-# Migrate the previously separate interface endpoint resources into the
-# for_each map so existing endpoints are not destroyed and recreated.
+# Migrate the previously separate interface endpoints into the for_each map (no destroy/recreate).
 moved {
   from = aws_vpc_endpoint.ecr_api[0]
   to   = aws_vpc_endpoint.interface["ecr.api"]

@@ -1,24 +1,5 @@
-# GoRules Internal ALB Example
-#
-# Both load balancers use the internal scheme in private subnets. They are not
-# reachable from the internet. Use this when policy forbids internet-facing ALBs
-# or public-subnet resources, or when the services are reached only from inside
-# your network.
-#
-# BRMS needs outbound internet. It validates its license at
-# https://portal.gorules.io, so a VPC with no egress cannot run BRMS. Make sure
-# the tasks can reach the internet through your network egress (NAT, a Transit
-# Gateway to a shared egress VPC, or a proxy). The Agent is self-contained and
-# needs no egress.
-#
-# Two modes, set by create_vpc:
-#   create_vpc = false (default) deploy into a VPC you already have. You pass the
-#                      private subnets and provide the egress. The module creates
-#                      nothing in a public subnet. This is the path for a
-#                      no-public-subnet policy.
-#   create_vpc = true  the module builds the VPC. BRMS needs egress, so this mode
-#                      adds a NAT gateway. The public subnets it creates host only
-#                      the NAT. The ALBs stay internal.
+# Internal ALB example: both ALBs internal in private subnets, not internet-facing.
+# create_vpc toggles existing-VPC vs module-built (with NAT for BRMS egress). See the README.
 
 terraform {
   required_version = ">= 1.14"
@@ -52,9 +33,7 @@ module "gorules" {
   region       = var.region
   tags         = var.tags
 
-  # create_vpc = false uses your VPC and your egress, and creates nothing public.
-  # create_vpc = true builds the VPC with a NAT so BRMS can reach its license
-  # server. The NAT needs public subnets; the ALBs stay internal.
+  # create_vpc = false uses your VPC; create_vpc = true builds one with a NAT.
   vpc = {
     create             = var.create_vpc
     cidr               = var.vpc_cidr
@@ -80,9 +59,7 @@ module "gorules" {
     backup_retention_period  = var.database_backup_retention_period
   }
 
-  # BRMS behind an internal ALB. BRMS requires HTTPS, so a certificate ARN is
-  # mandatory. allowed_cidr_blocks should list the internal ranges that may reach
-  # the ALB, not 0.0.0.0/0.
+  # BRMS behind an internal ALB (HTTPS required, so certificate_arn is mandatory).
   brms = {
     license_key_secret_arn  = var.brms_license_key_secret_arn
     image                   = var.brms_image
@@ -97,8 +74,7 @@ module "gorules" {
     alb_deletion_protection = var.brms_alb_deletion_protection
   }
 
-  # Agent behind an internal ALB. Leave agent_domain unset to serve HTTP inside
-  # the VPC, or set a domain with a certificate_arn to terminate HTTPS on the ALB.
+  # Agent behind an internal ALB (HTTP by default; set domain + cert for HTTPS).
   agent = {
     image                   = var.agent_image
     cpu                     = var.agent_cpu
