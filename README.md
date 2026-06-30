@@ -18,3 +18,7 @@ GoRules is a Business Rules Management System (BRMS) for managing and executing 
 ## Getting Started
 
 See the [AWS module documentation](aws/) for usage instructions and examples.
+
+## Documentation
+
+Full documentation is in the [project Wiki](https://github.com/gorules/terraform-modules/wiki).
