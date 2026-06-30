@@ -13,16 +13,28 @@ resource "aws_lb" "brms" {
   count = local.create_brms ? 1 : 0
 
   name               = "${var.name_prefix}-brms-alb"
-  internal           = false
+  internal           = var.brms.alb_internal
   load_balancer_type = "application"
   security_groups    = [aws_security_group.brms_alb[0].id]
-  subnets            = var.public_subnet_ids
+  subnets            = var.brms.alb_internal ? var.private_subnet_ids : var.public_subnet_ids
 
   enable_deletion_protection = var.brms.alb_deletion_protection
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-brms-alb"
   })
+
+  lifecycle {
+    precondition {
+      condition     = var.brms.alb_internal || length(var.public_subnet_ids) > 0
+      error_message = "BRMS ALB is internet-facing but no public subnets were provided. Set brms.alb_internal = true to place it in private subnets, or pass public_subnet_ids."
+    }
+
+    precondition {
+      condition     = length(var.brms.alb_internal ? var.private_subnet_ids : var.public_subnet_ids) >= 2
+      error_message = "The BRMS ALB requires at least 2 subnets in different Availability Zones (private subnets when alb_internal = true, otherwise public subnets)."
+    }
+  }
 }
 
 resource "aws_lb_target_group" "brms" {
@@ -64,18 +76,23 @@ resource "aws_lb_listener" "brms_http" {
   protocol          = "HTTP"
 
   default_action {
-    type = "redirect"
+    type = local.brms_use_tls ? "redirect" : "forward"
 
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
+    dynamic "redirect" {
+      for_each = local.brms_use_tls ? [1] : []
+      content {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
     }
+
+    target_group_arn = local.brms_use_tls ? null : aws_lb_target_group.brms[0].arn
   }
 }
 
 resource "aws_lb_listener" "brms_https" {
-  count = local.create_brms ? 1 : 0
+  count = local.create_brms && local.brms_use_tls ? 1 : 0
 
   load_balancer_arn = aws_lb.brms[0].arn
   port              = 443

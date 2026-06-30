@@ -3,7 +3,24 @@ data "aws_region" "current" {}
 locals {
   az_count = length(var.availability_zones)
 
-  nat_gateway_count = var.nat_gateway_mode == "ha" ? local.az_count : 1
+  nat_enabled       = var.nat_gateway_mode != "none"
+  nat_gateway_count = local.nat_enabled ? (var.nat_gateway_mode == "ha" ? local.az_count : 1) : 0
+
+  # Private route tables always exist (independent of NAT) so the S3 gateway
+  # endpoint has a route table to attach to and private subnets get explicit
+  # associations.
+  private_rt_count = var.nat_gateway_mode == "ha" ? local.az_count : 1
+
+  # Public subnets (and the internet gateway) exist when an internet-facing ALB
+  # needs them, or to host a NAT gateway. With nat_gateway_mode = "none" and no
+  # internet-facing ALB the VPC is fully private (no public subnets, internet
+  # gateway, NAT gateway or EIP), which satisfies policies that forbid creating
+  # any resource in a public subnet.
+  create_public = var.create_public_subnets || local.nat_enabled
+
+  # With no NAT gateway, VPC endpoints are the only path to AWS services, so
+  # create them automatically in that case.
+  create_endpoints = var.enable_vpc_endpoints || !local.nat_enabled
 
   common_tags = merge(var.tags, {
     Module = "vpc"
@@ -21,6 +38,8 @@ resource "aws_vpc" "this" {
 }
 
 resource "aws_internet_gateway" "this" {
+  count = local.create_public ? 1 : 0
+
   vpc_id = aws_vpc.this.id
 
   tags = merge(local.common_tags, {
@@ -28,8 +47,14 @@ resource "aws_internet_gateway" "this" {
   })
 }
 
+# Preserve state for VPCs created before the internet gateway became optional.
+moved {
+  from = aws_internet_gateway.this
+  to   = aws_internet_gateway.this[0]
+}
+
 resource "aws_subnet" "public" {
-  count = local.az_count
+  count = local.create_public ? local.az_count : 0
 
   vpc_id                  = aws_vpc.this.id
   cidr_block              = cidrsubnet(var.cidr, 8, count.index)
@@ -81,6 +106,8 @@ resource "aws_nat_gateway" "this" {
 }
 
 resource "aws_route_table" "public" {
+  count = local.create_public ? 1 : 0
+
   vpc_id = aws_vpc.this.id
 
   tags = merge(local.common_tags, {
@@ -88,21 +115,34 @@ resource "aws_route_table" "public" {
   })
 }
 
+# Preserve state for VPCs created before the public route table became optional.
+moved {
+  from = aws_route_table.public
+  to   = aws_route_table.public[0]
+}
+
 resource "aws_route" "public_internet" {
-  route_table_id         = aws_route_table.public.id
+  count = local.create_public ? 1 : 0
+
+  route_table_id         = aws_route_table.public[0].id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.this.id
+  gateway_id             = aws_internet_gateway.this[0].id
+}
+
+moved {
+  from = aws_route.public_internet
+  to   = aws_route.public_internet[0]
 }
 
 resource "aws_route_table_association" "public" {
-  count = local.az_count
+  count = local.create_public ? local.az_count : 0
 
   subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
+  route_table_id = aws_route_table.public[0].id
 }
 
 resource "aws_route_table" "private" {
-  count = local.nat_gateway_count
+  count = local.private_rt_count
 
   vpc_id = aws_vpc.this.id
 

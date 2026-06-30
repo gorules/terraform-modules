@@ -1,15 +1,21 @@
 locals {
-  create_brms_certificate  = local.create_brms && var.brms.route53_zone_id != null
-  create_agent_certificate = local.create_agent && var.agent.domain != null && var.agent.route53_zone_id != null
+  create_brms_certificate  = local.create_brms && var.brms.route53_zone_id != null && !var.brms.alb_http_only
+  create_agent_certificate = local.create_agent && var.agent.domain != null && var.agent.route53_zone_id != null && !var.agent.alb_http_only
+
+  # TLS is terminated on the ALB unless alb_http_only is set, in which case a
+  # trusted edge such as CloudFront terminates HTTPS and the ALB serves HTTP.
+  brms_use_tls  = var.brms != null ? !var.brms.alb_http_only : false
+  agent_use_tls = var.agent != null ? (!var.agent.alb_http_only && local.agent_certificate_arn != null) : false
 
   brms_certificate_arn = var.brms != null ? (
     var.brms.certificate_arn != null ? var.brms.certificate_arn :
-    aws_acm_certificate.brms[0].arn
+    local.create_brms_certificate ? aws_acm_certificate.brms[0].arn :
+    null
   ) : null
 
   agent_certificate_arn = var.agent != null ? (
     var.agent.certificate_arn != null ? var.agent.certificate_arn :
-    var.agent.route53_zone_id != null ? aws_acm_certificate.agent[0].arn :
+    local.create_agent_certificate ? aws_acm_certificate.agent[0].arn :
     null
   ) : null
 }

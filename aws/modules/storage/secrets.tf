@@ -37,6 +37,6 @@ resource "aws_secretsmanager_secret_version" "s3_credentials" {
     access_key_id     = aws_iam_access_key.s3_access[0].id
     secret_access_key = aws_iam_access_key.s3_access[0].secret
     bucket_name       = local.bucket_name
-    region            = data.aws_region.current.id
+    region            = data.aws_region.current.region
   })
 }

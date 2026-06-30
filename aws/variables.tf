@@ -56,36 +56,37 @@ variable "vpc" {
     - create: Whether to create a new VPC (default: true)
     - cidr: VPC CIDR block for new VPC (default: "10.0.0.0/16")
     - availability_zones: List of AZs to use. Empty list uses first 2 available AZs.
-    - nat_gateway_mode: "single" for cost savings or "ha" for high availability (default: "single")
-    - enable_vpc_endpoints: Create VPC endpoints for S3, ECR, CloudWatch, Secrets Manager (default: false)
+    - nat_gateway_mode: "single" (one NAT gateway), "ha" (one per AZ), or "none" (default: "single"). "none" creates no NAT gateway, no EIP, and no public subnets unless an internet-facing ALB needs them; ECS tasks then reach AWS through VPC endpoints. Combine "none" with internal ALBs to build a VPC with no public-subnet resources.
+    - enable_vpc_endpoints: Create VPC endpoints (S3 gateway + interface endpoints for ECR, CloudWatch Logs, Secrets Manager, STS). Created automatically when nat_gateway_mode = "none" (default: false).
+    - additional_vpc_endpoints: Extra interface VPC endpoint service short-names to create, e.g. ["ssmmessages"] for ECS Exec. "kms" and "bedrock-runtime" are added automatically when BRMS uses the aws-kms secrets provider or the amazon-bedrock AI provider (default: []).
     - id: Existing VPC ID (required if create=false)
     - private_subnet_ids: Existing private subnet IDs (required if create=false)
-    - public_subnet_ids: Existing public subnet IDs (required if create=false)
+    - public_subnet_ids: Existing public subnet IDs. Required only when an ALB is internet-facing (alb_internal = false).
   EOT
   type = object({
-    create               = optional(bool, true)
-    cidr                 = optional(string, "10.0.0.0/16")
-    availability_zones   = optional(list(string), [])
-    nat_gateway_mode     = optional(string, "single")
-    enable_vpc_endpoints = optional(bool, false)
-    id                   = optional(string)
-    private_subnet_ids   = optional(list(string), [])
-    public_subnet_ids    = optional(list(string), [])
+    create                   = optional(bool, true)
+    cidr                     = optional(string, "10.0.0.0/16")
+    availability_zones       = optional(list(string), [])
+    nat_gateway_mode         = optional(string, "single")
+    enable_vpc_endpoints     = optional(bool, false)
+    additional_vpc_endpoints = optional(list(string), [])
+    id                       = optional(string)
+    private_subnet_ids       = optional(list(string), [])
+    public_subnet_ids        = optional(list(string), [])
   })
   default = {}
 
   validation {
-    condition     = var.vpc == null || var.vpc.nat_gateway_mode == null || contains(["single", "ha"], var.vpc.nat_gateway_mode)
-    error_message = "nat_gateway_mode must be 'single' or 'ha'."
+    condition     = var.vpc == null || var.vpc.nat_gateway_mode == null || contains(["single", "ha", "none"], var.vpc.nat_gateway_mode)
+    error_message = "nat_gateway_mode must be 'single', 'ha', or 'none'."
   }
 
   validation {
     condition = var.vpc == null || var.vpc.create == true || (
       var.vpc.id != null &&
-      length(var.vpc.private_subnet_ids) > 0 &&
-      length(var.vpc.public_subnet_ids) > 0
+      length(var.vpc.private_subnet_ids) > 0
     )
-    error_message = "When create=false, id, private_subnet_ids, and public_subnet_ids are required."
+    error_message = "When create=false, vpc.id and at least one private_subnet_id are required. Public subnets are required only for internet-facing ALBs."
   }
 
   validation {
@@ -245,6 +246,8 @@ variable "brms" {
     - route53_zone_id: Route53 hosted zone ID for automatic certificate creation and DNS (provide this OR certificate_arn)
     - allowed_cidr_blocks: CIDR blocks allowed to access ALB
     - alb_deletion_protection: Enable ALB deletion protection (default: true)
+    - alb_internal: Place the ALB in private subnets using the internal scheme (default: false). When true the ALB has no public IPs and is reachable only from inside the VPC or connected networks. Public subnets are not needed for the ALB. To avoid all public-subnet resources with a module-created VPC, also set vpc.nat_gateway_mode = "none" (no NAT gateway, EIP or public subnets; tasks egress through VPC endpoints), or bring an existing private VPC (vpc.create = false). See the README for certificate, container image and VPC endpoint notes.
+    - alb_http_only: Serve the ALB over HTTP only, for use behind a TLS-terminating edge such as CloudFront that provides HTTPS to clients (default: false). Requires alb_internal = true. BRMS still needs the browser to use HTTPS, so the edge must provide it. The public domain is still required for APP_URL.
     - env: Additional environment variables
     - secrets: Additional secrets from Secrets Manager
     - external_buckets: List of external S3 buckets for cross-account deployments (default: [])
@@ -273,6 +276,8 @@ variable "brms" {
     route53_zone_id         = optional(string)
     allowed_cidr_blocks     = list(string)
     alb_deletion_protection = optional(bool, true)
+    alb_internal            = optional(bool, false)
+    alb_http_only           = optional(bool, false)
     env                     = optional(list(object({ name = string, value = string })), [])
     secrets                 = optional(list(object({ name = string, valueFrom = string })), [])
     secrets_provider = optional(object({
@@ -344,10 +349,15 @@ variable "brms" {
   }
 
   validation {
-    condition = var.brms == null || (
+    condition = var.brms == null || var.brms.alb_http_only || (
       var.brms.route53_zone_id != null || var.brms.certificate_arn != null
     )
-    error_message = "BRMS requires HTTPS. Provide either route53_zone_id (auto-create certificate) or certificate_arn (existing certificate)."
+    error_message = "BRMS requires HTTPS. Provide route53_zone_id or certificate_arn. Alternatively set alb_http_only = true when a trusted edge such as CloudFront terminates TLS."
+  }
+
+  validation {
+    condition     = var.brms == null || !var.brms.alb_http_only || var.brms.alb_internal
+    error_message = "brms.alb_http_only requires brms.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
   }
 
   validation {
@@ -459,6 +469,8 @@ variable "agent" {
     - route53_zone_id: Route53 hosted zone ID for automatic certificate creation and DNS (provide this OR certificate_arn when domain is set)
     - allowed_cidr_blocks: CIDR blocks allowed to access ALB
     - alb_deletion_protection: Enable ALB deletion protection (default: true)
+    - alb_internal: Place the ALB in private subnets using the internal scheme (default: false). When true the ALB has no public IPs and is reachable only from inside the VPC or connected networks. Public subnets are not needed for the ALB. To avoid all public-subnet resources with a module-created VPC, also set vpc.nat_gateway_mode = "none" (no NAT gateway, EIP or public subnets; tasks egress through VPC endpoints), or bring an existing private VPC (vpc.create = false). See the README for certificate, container image and VPC endpoint notes.
+    - alb_http_only: Serve the ALB over HTTP only, for use behind a TLS-terminating edge such as CloudFront that provides HTTPS to clients (default: false). Requires alb_internal = true. BRMS still needs the browser to use HTTPS, so the edge must provide it. The public domain is still required for APP_URL.
     - env: Additional environment variables
     - secrets: Additional secrets from Secrets Manager
   EOT
@@ -476,6 +488,8 @@ variable "agent" {
     route53_zone_id         = optional(string)
     allowed_cidr_blocks     = list(string)
     alb_deletion_protection = optional(bool, true)
+    alb_internal            = optional(bool, false)
+    alb_http_only           = optional(bool, false)
     env                     = optional(list(object({ name = string, value = string })), [])
     secrets                 = optional(list(object({ name = string, valueFrom = string })), [])
   })
@@ -520,9 +534,14 @@ variable "agent" {
   }
 
   validation {
-    condition = var.agent == null || var.agent.domain == null || (
+    condition = var.agent == null || var.agent.alb_http_only || var.agent.domain == null || (
       var.agent.route53_zone_id != null || var.agent.certificate_arn != null
     )
-    error_message = "When agent.domain is set, provide either route53_zone_id (auto-create certificate) or certificate_arn (existing certificate)."
+    error_message = "When agent.domain is set, provide route53_zone_id or certificate_arn. Alternatively set alb_http_only = true when a trusted edge terminates TLS."
+  }
+
+  validation {
+    condition     = var.agent == null || !var.agent.alb_http_only || var.agent.alb_internal
+    error_message = "agent.alb_http_only requires agent.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
   }
 }

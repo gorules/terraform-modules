@@ -17,7 +17,7 @@ output "bucket_id" {
 
 output "bucket_region" {
   description = "Region of the S3 bucket"
-  value       = data.aws_region.current.id
+  value       = data.aws_region.current.region
 }
 
 # IAM Policy Outputs

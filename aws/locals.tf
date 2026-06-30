@@ -18,6 +18,22 @@ locals {
   create_brms     = var.brms != null
   create_agent    = var.agent != null
   create_ecs      = local.create_brms || local.create_agent
+
+  # Public subnets are only needed when an ALB uses the internet-facing scheme.
+  needs_public_subnets = (
+    (var.brms != null ? !var.brms.alb_internal : false) ||
+    (var.agent != null ? !var.agent.alb_internal : false)
+  )
+
+  # Interface VPC endpoints to add beyond the base set when the module creates a
+  # VPC. KMS is needed when BRMS uses the aws-kms secrets provider;
+  # bedrock-runtime when BRMS AI uses Amazon Bedrock. Users can add more (e.g.
+  # ssmmessages for ECS Exec) via vpc.additional_vpc_endpoints.
+  vpc_additional_endpoints = distinct(concat(
+    (var.brms != null && var.brms.secrets_provider.type == "aws-kms") ? ["kms"] : [],
+    (var.brms != null && var.brms.ai != null ? var.brms.ai.provider == "amazon-bedrock" : false) ? ["bedrock-runtime"] : [],
+    var.vpc != null ? var.vpc.additional_vpc_endpoints : [],
+  ))
 }
 
 locals {

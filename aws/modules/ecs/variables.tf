@@ -26,13 +26,9 @@ variable "private_subnet_ids" {
 }
 
 variable "public_subnet_ids" {
-  description = "List of public subnet IDs for Application Load Balancers"
+  description = "List of public subnet IDs for internet-facing Application Load Balancers. May be empty when every ALB uses the internal scheme (alb_internal = true)."
   type        = list(string)
-
-  validation {
-    condition     = length(var.public_subnet_ids) >= 1
-    error_message = "At least 1 public subnet is required for ALBs."
-  }
+  default     = []
 }
 
 # BRMS Configuration
@@ -57,6 +53,8 @@ variable "brms" {
     - certificate_arn: ACM certificate ARN for HTTPS (provide this OR route53_zone_id)
     - route53_zone_id: Route53 hosted zone ID for automatic certificate creation and DNS (provide this OR certificate_arn)
     - allowed_cidr_blocks: CIDR blocks allowed to access ALB
+    - alb_internal: Place the ALB in private subnets using the internal scheme (default: false)
+    - alb_http_only: Serve the ALB over HTTP only, for use behind a TLS-terminating edge such as CloudFront (default: false). Requires alb_internal = true.
     - enable_execute_command: Enable ECS Exec for debugging (default: false)
     - deregistration_delay: Seconds to wait before deregistering targets (default: 30)
     - env: Additional environment variables
@@ -80,6 +78,8 @@ variable "brms" {
     enable_execute_command    = optional(bool, false)
     deregistration_delay      = optional(number, 30)
     alb_deletion_protection   = optional(bool, true)
+    alb_internal              = optional(bool, false)
+    alb_http_only             = optional(bool, false)
     env                       = optional(list(object({ name = string, value = string })), [])
     secrets                   = optional(list(object({ name = string, valueFrom = string })), [])
     secrets_provider = optional(object({
@@ -114,10 +114,15 @@ variable "brms" {
   }
 
   validation {
-    condition = var.brms == null || (
+    condition = var.brms == null || var.brms.alb_http_only || (
       var.brms.route53_zone_id != null || var.brms.certificate_arn != null
     )
-    error_message = "BRMS requires HTTPS. Provide either route53_zone_id (auto-create certificate) or certificate_arn (existing certificate)."
+    error_message = "BRMS requires HTTPS. Provide route53_zone_id or certificate_arn. Alternatively set alb_http_only = true when a trusted edge such as CloudFront terminates TLS."
+  }
+
+  validation {
+    condition     = var.brms == null || !var.brms.alb_http_only || var.brms.alb_internal
+    error_message = "brms.alb_http_only requires brms.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
   }
 
   validation {
@@ -147,6 +152,8 @@ variable "agent" {
     - certificate_arn: ACM certificate ARN for HTTPS (provide this OR route53_zone_id when domain is set)
     - route53_zone_id: Route53 hosted zone ID for automatic certificate creation and DNS (provide this OR certificate_arn when domain is set)
     - allowed_cidr_blocks: CIDR blocks allowed to access ALB
+    - alb_internal: Place the ALB in private subnets using the internal scheme (default: false)
+    - alb_http_only: Serve the ALB over HTTP only, for use behind a TLS-terminating edge such as CloudFront (default: false). Requires alb_internal = true.
     - enable_execute_command: Enable ECS Exec for debugging (default: false)
     - deregistration_delay: Seconds to wait before deregistering targets (default: 30)
     - env: Additional environment variables
@@ -169,6 +176,8 @@ variable "agent" {
     enable_execute_command    = optional(bool, false)
     deregistration_delay      = optional(number, 30)
     alb_deletion_protection   = optional(bool, true)
+    alb_internal              = optional(bool, false)
+    alb_http_only             = optional(bool, false)
     env                       = optional(list(object({ name = string, value = string })), [])
     secrets                   = optional(list(object({ name = string, valueFrom = string })), [])
   })
@@ -185,10 +194,15 @@ variable "agent" {
   }
 
   validation {
-    condition = var.agent == null || var.agent.domain == null || (
+    condition = var.agent == null || var.agent.alb_http_only || var.agent.domain == null || (
       var.agent.route53_zone_id != null || var.agent.certificate_arn != null
     )
-    error_message = "When agent.domain is set, provide either route53_zone_id (auto-create certificate) or certificate_arn (existing certificate)."
+    error_message = "When agent.domain is set, provide route53_zone_id or certificate_arn. Alternatively set alb_http_only = true when a trusted edge terminates TLS."
+  }
+
+  validation {
+    condition     = var.agent == null || !var.agent.alb_http_only || var.agent.alb_internal
+    error_message = "agent.alb_http_only requires agent.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
   }
 }
 

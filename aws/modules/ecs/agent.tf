@@ -13,16 +13,28 @@ resource "aws_lb" "agent" {
   count = local.create_agent ? 1 : 0
 
   name               = "${var.name_prefix}-agent-alb"
-  internal           = false
+  internal           = var.agent.alb_internal
   load_balancer_type = "application"
   security_groups    = [aws_security_group.agent_alb[0].id]
-  subnets            = var.public_subnet_ids
+  subnets            = var.agent.alb_internal ? var.private_subnet_ids : var.public_subnet_ids
 
   enable_deletion_protection = var.agent.alb_deletion_protection
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-agent-alb"
   })
+
+  lifecycle {
+    precondition {
+      condition     = var.agent.alb_internal || length(var.public_subnet_ids) > 0
+      error_message = "Agent ALB is internet-facing but no public subnets were provided. Set agent.alb_internal = true to place it in private subnets, or pass public_subnet_ids."
+    }
+
+    precondition {
+      condition     = length(var.agent.alb_internal ? var.private_subnet_ids : var.public_subnet_ids) >= 2
+      error_message = "The Agent ALB requires at least 2 subnets in different Availability Zones (private subnets when alb_internal = true, otherwise public subnets)."
+    }
+  }
 }
 
 resource "aws_lb_target_group" "agent" {
@@ -64,10 +76,10 @@ resource "aws_lb_listener" "agent_http" {
   protocol          = "HTTP"
 
   default_action {
-    type = local.agent_certificate_arn != null ? "redirect" : "forward"
+    type = local.agent_use_tls ? "redirect" : "forward"
 
     dynamic "redirect" {
-      for_each = local.agent_certificate_arn != null ? [1] : []
+      for_each = local.agent_use_tls ? [1] : []
       content {
         port        = "443"
         protocol    = "HTTPS"
@@ -75,12 +87,12 @@ resource "aws_lb_listener" "agent_http" {
       }
     }
 
-    target_group_arn = local.agent_certificate_arn == null ? aws_lb_target_group.agent[0].arn : null
+    target_group_arn = local.agent_use_tls ? null : aws_lb_target_group.agent[0].arn
   }
 }
 
 resource "aws_lb_listener" "agent_https" {
-  count = local.create_agent && local.agent_certificate_arn != null ? 1 : 0
+  count = local.create_agent && local.agent_use_tls ? 1 : 0
 
   load_balancer_arn = aws_lb.agent[0].arn
   port              = 443
