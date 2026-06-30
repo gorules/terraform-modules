@@ -48,7 +48,7 @@ flowchart TB
         end
     end
 
-    Egress[Your egress\nNAT / TGW / proxy]
+    Egress[Your egress<br/>NAT / TGW / proxy]
 
     Clients --> BRMS_ALB
     Clients --> Agent_ALB
@@ -161,7 +161,7 @@ terraform apply
 ```
 
 > [!NOTE]
-> The `internal` scheme is fixed for the life of a load balancer. Choose it before the first apply. Flipping `alb_internal` later replaces the ALB, which changes its DNS name.
+> This example fixes the internal scheme in `main.tf`. The scheme is immutable for an ALB's life: changing it later replaces the ALB and changes its DNS name, so do not switch a deployed ALB between internal and internet-facing.
 
 ## Step 6: Configure internal DNS
 

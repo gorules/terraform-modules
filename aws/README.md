@@ -9,6 +9,8 @@ Terraform modules for deploying GoRules on AWS ECS Fargate.
 
 ## Architecture
 
+The diagram below shows the default internet-facing pattern (both ALBs in public subnets). With `alb_internal = true` the ALBs move to the private subnets; see [Internal Load Balancers](#internal-load-balancers).
+
 ```mermaid
 flowchart TB
     Internet((Internet))
@@ -263,6 +265,7 @@ AWS Secrets Manager to retrieve master database credentials.
 **Network requirement (one of):**
 1. **NAT Gateway** - Default when using this module's VPC
 2. **Secrets Manager VPC Endpoint** - Set `vpc.enable_vpc_endpoints = true`
+3. **Fully private VPC** - Set `vpc.nat_gateway_mode = "none"`, which auto-provisions the base interface endpoints (including Secrets Manager); no need to set `enable_vpc_endpoints`
 
 Note: This requirement only applies to IAM auth. The default `secrets` auth
 mode uses ECS secrets injection, which doesn't require VPC connectivity.
