@@ -55,6 +55,7 @@ variable "brms" {
     - allowed_cidr_blocks: CIDR blocks allowed to access ALB
     - alb_internal: Place the ALB in private subnets using the internal scheme (default: false)
     - alb_http_only: Serve the ALB over HTTP only, for use behind a TLS-terminating edge such as CloudFront (default: false). Requires alb_internal = true.
+    - alb_idle_timeout: ALB connection idle timeout in seconds (default: 60, range 1-4000). Increase it for long-running requests (for example BRMS AI generation with large models) that can exceed 60s, otherwise the ALB closes the idle connection.
     - enable_execute_command: Enable ECS Exec for debugging (default: false)
     - deregistration_delay: Seconds to wait before deregistering targets (default: 30)
     - env: Additional environment variables
@@ -80,6 +81,7 @@ variable "brms" {
     alb_deletion_protection   = optional(bool, true)
     alb_internal              = optional(bool, false)
     alb_http_only             = optional(bool, false)
+    alb_idle_timeout          = optional(number, 60)
     env                       = optional(list(object({ name = string, value = string })), [])
     secrets                   = optional(list(object({ name = string, valueFrom = string })), [])
     secrets_provider = optional(object({
@@ -126,6 +128,11 @@ variable "brms" {
   }
 
   validation {
+    condition     = var.brms == null || (var.brms.alb_idle_timeout >= 1 && var.brms.alb_idle_timeout <= 4000)
+    error_message = "brms.alb_idle_timeout must be between 1 and 4000 seconds."
+  }
+
+  validation {
     condition     = var.brms == null || var.brms.ai == null || var.brms.ai.provider != "amazon-bedrock" || can(regex("^(us|eu|apac|global|au|ca|jp|us-gov)\\.", var.brms.ai.model))
     error_message = "For amazon-bedrock provider, model must use an inference profile ID with a geographic prefix (e.g., us.amazon.nova-2-lite-v1:0, eu.anthropic.claude-sonnet-4-6-v1:0). See https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html"
   }
@@ -154,6 +161,7 @@ variable "agent" {
     - allowed_cidr_blocks: CIDR blocks allowed to access ALB
     - alb_internal: Place the ALB in private subnets using the internal scheme (default: false)
     - alb_http_only: Serve the ALB over HTTP only, for use behind a TLS-terminating edge such as CloudFront (default: false). Requires alb_internal = true.
+    - alb_idle_timeout: ALB connection idle timeout in seconds (default: 60, range 1-4000). Increase it for long-running requests (for example BRMS AI generation with large models) that can exceed 60s, otherwise the ALB closes the idle connection.
     - enable_execute_command: Enable ECS Exec for debugging (default: false)
     - deregistration_delay: Seconds to wait before deregistering targets (default: 30)
     - env: Additional environment variables
@@ -178,6 +186,7 @@ variable "agent" {
     alb_deletion_protection   = optional(bool, true)
     alb_internal              = optional(bool, false)
     alb_http_only             = optional(bool, false)
+    alb_idle_timeout          = optional(number, 60)
     env                       = optional(list(object({ name = string, value = string })), [])
     secrets                   = optional(list(object({ name = string, valueFrom = string })), [])
   })
@@ -203,6 +212,11 @@ variable "agent" {
   validation {
     condition     = var.agent == null || !var.agent.alb_http_only || var.agent.alb_internal
     error_message = "agent.alb_http_only requires agent.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
+  }
+
+  validation {
+    condition     = var.agent == null || (var.agent.alb_idle_timeout >= 1 && var.agent.alb_idle_timeout <= 4000)
+    error_message = "agent.alb_idle_timeout must be between 1 and 4000 seconds."
   }
 }
 

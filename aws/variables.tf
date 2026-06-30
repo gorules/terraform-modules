@@ -248,6 +248,7 @@ variable "brms" {
     - alb_deletion_protection: Enable ALB deletion protection (default: true)
     - alb_internal: Place the ALB in private subnets using the internal scheme (default: false). When true the ALB has no public IPs and is reachable only from inside the VPC or connected networks. Public subnets are not needed for the ALB. To avoid all public-subnet resources with a module-created VPC, also set vpc.nat_gateway_mode = "none" (no NAT gateway, EIP or public subnets; tasks egress through VPC endpoints), or bring an existing private VPC (vpc.create = false). See the README for certificate, container image and VPC endpoint notes.
     - alb_http_only: Serve the ALB over HTTP only, for use behind a TLS-terminating edge such as CloudFront that provides HTTPS to clients (default: false). Requires alb_internal = true. BRMS still needs the browser to use HTTPS, so the edge must provide it. The public domain is still required for APP_URL.
+    - alb_idle_timeout: ALB connection idle timeout in seconds (default: 60, range 1-4000). Increase it for long-running requests (for example BRMS AI generation with large models) that can exceed 60s, otherwise the ALB closes the idle connection.
     - env: Additional environment variables
     - secrets: Additional secrets from Secrets Manager
     - external_buckets: List of external S3 buckets for cross-account deployments (default: [])
@@ -278,6 +279,7 @@ variable "brms" {
     alb_deletion_protection = optional(bool, true)
     alb_internal            = optional(bool, false)
     alb_http_only           = optional(bool, false)
+    alb_idle_timeout        = optional(number, 60)
     env                     = optional(list(object({ name = string, value = string })), [])
     secrets                 = optional(list(object({ name = string, valueFrom = string })), [])
     secrets_provider = optional(object({
@@ -358,6 +360,11 @@ variable "brms" {
   validation {
     condition     = var.brms == null || !var.brms.alb_http_only || var.brms.alb_internal
     error_message = "brms.alb_http_only requires brms.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
+  }
+
+  validation {
+    condition     = var.brms == null || (var.brms.alb_idle_timeout >= 1 && var.brms.alb_idle_timeout <= 4000)
+    error_message = "brms.alb_idle_timeout must be between 1 and 4000 seconds."
   }
 
   validation {
@@ -471,6 +478,7 @@ variable "agent" {
     - alb_deletion_protection: Enable ALB deletion protection (default: true)
     - alb_internal: Place the ALB in private subnets using the internal scheme (default: false). When true the ALB has no public IPs and is reachable only from inside the VPC or connected networks. Public subnets are not needed for the ALB. To avoid all public-subnet resources with a module-created VPC, also set vpc.nat_gateway_mode = "none" (no NAT gateway, EIP or public subnets; tasks egress through VPC endpoints), or bring an existing private VPC (vpc.create = false). See the README for certificate, container image and VPC endpoint notes.
     - alb_http_only: Serve the ALB over HTTP only, for use behind a TLS-terminating edge such as CloudFront that provides HTTPS to clients (default: false). Requires alb_internal = true. BRMS still needs the browser to use HTTPS, so the edge must provide it. The public domain is still required for APP_URL.
+    - alb_idle_timeout: ALB connection idle timeout in seconds (default: 60, range 1-4000). Increase it for long-running requests (for example BRMS AI generation with large models) that can exceed 60s, otherwise the ALB closes the idle connection.
     - env: Additional environment variables
     - secrets: Additional secrets from Secrets Manager
   EOT
@@ -490,6 +498,7 @@ variable "agent" {
     alb_deletion_protection = optional(bool, true)
     alb_internal            = optional(bool, false)
     alb_http_only           = optional(bool, false)
+    alb_idle_timeout        = optional(number, 60)
     env                     = optional(list(object({ name = string, value = string })), [])
     secrets                 = optional(list(object({ name = string, valueFrom = string })), [])
   })
@@ -543,5 +552,10 @@ variable "agent" {
   validation {
     condition     = var.agent == null || !var.agent.alb_http_only || var.agent.alb_internal
     error_message = "agent.alb_http_only requires agent.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
+  }
+
+  validation {
+    condition     = var.agent == null || (var.agent.alb_idle_timeout >= 1 && var.agent.alb_idle_timeout <= 4000)
+    error_message = "agent.alb_idle_timeout must be between 1 and 4000 seconds."
   }
 }

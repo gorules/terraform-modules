@@ -18,6 +18,7 @@ resource "aws_lb" "brms" {
   security_groups    = [aws_security_group.brms_alb[0].id]
   subnets            = var.brms.alb_internal ? var.private_subnet_ids : var.public_subnet_ids
 
+  idle_timeout               = var.brms.alb_idle_timeout
   enable_deletion_protection = var.brms.alb_deletion_protection
 
   tags = merge(local.common_tags, {

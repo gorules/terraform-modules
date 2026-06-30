@@ -198,6 +198,22 @@ This is the shape GoRules runs in production: CloudFront with a VPC origin termi
 3. For public access, keep the ALB internal and front it with an AWS managed
    edge such as CloudFront with a VPC origin.
 
+**Testing the UI from your laptop.** To reach an internal ALB without setting up
+DNS, port-forward to it through an SSM-managed instance in the VPC (any instance
+with the `AmazonSSMManagedInstanceCore` policy and the SSM agent):
+
+```bash
+aws ssm start-session --target <instance-id> \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters '{"host":["<alb_dns_name>"],"portNumber":["80"],"localPortNumber":["8080"]}'
+```
+
+Browsers treat `http://localhost` as a secure context, which is exactly what the
+BRMS frontend needs (Web Crypto, Service Workers). So with `alb_http_only = true`
+you can forward to the HTTP listener and open `http://localhost:8080` with no
+certificate at all. It is the quickest way to look at the UI behind an internal
+ALB before DNS and the edge are in place.
+
 ### Egress in a no-public-subnet VPC
 
 A VPC with no NAT gateway has no route to the internet, so the ECS tasks reach
@@ -316,6 +332,11 @@ Supported providers: `openai`, `anthropic`, `google`, `amazon-bedrock`, `azure-o
 
 See the [GoRules AI setup guide](https://docs.gorules.io/developers/deployment/brms/ai-setup) for details on how the AI assistant works within BRMS.
 
+> [!NOTE]
+> Large models such as Opus can take more than 60 seconds to return the first
+> token. The ALB's default 60s idle timeout drops the request before the answer
+> arrives. See [ALB idle timeout](#alb-idle-timeout) to raise it.
+
 **Anthropic (Claude)**
 ```hcl
 brms = {
@@ -368,6 +389,29 @@ brms = {
 | `thinking_level` | `"medium"` | Thinking level: `high`, `medium` |
 | `context_window` | `null` | Override context window size |
 | `azure_resource_name` | `null` | Azure OpenAI resource name (required for azure-openai) |
+
+## ALB idle timeout
+
+Both ALBs use the AWS default connection idle timeout of 60 seconds. A request
+that sends no bytes for longer than this is closed by the ALB, which the client
+sees as a 504.
+
+This matters most for the BRMS AI assistant. A large model can take more than 60
+seconds to return the first token, so the connection goes idle and the ALB drops
+it before the answer arrives. Raise `alb_idle_timeout` on the component to cover
+the slowest response you expect. The maximum is 4000 seconds.
+
+```hcl
+brms = {
+  # ... other settings
+  ai               = { provider = "anthropic", model = "claude-opus-4-8" /* ... */ }
+  alb_idle_timeout = 180
+}
+```
+
+The field is set per component, so `agent` accepts it too. If a CDN or proxy such
+as CloudFront sits in front of the ALB, raise its origin response timeout to
+match, otherwise the edge times out first.
 
 ## Examples
 

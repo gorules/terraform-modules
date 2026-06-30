@@ -18,6 +18,7 @@ resource "aws_lb" "agent" {
   security_groups    = [aws_security_group.agent_alb[0].id]
   subnets            = var.agent.alb_internal ? var.private_subnet_ids : var.public_subnet_ids
 
+  idle_timeout               = var.agent.alb_idle_timeout
   enable_deletion_protection = var.agent.alb_deletion_protection
 
   tags = merge(local.common_tags, {
