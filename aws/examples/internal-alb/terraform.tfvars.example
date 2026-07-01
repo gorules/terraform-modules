@@ -1,0 +1,106 @@
+# GoRules Internal ALB Example - terraform.tfvars
+#
+# Copy this file to terraform.tfvars and set the values for your environment.
+
+# --- Required ---
+
+project_name = "gorules"
+environment  = "prod"
+region       = "us-east-1"
+
+brms_license_key_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:gorules-license-key-AbCdEf"
+
+# --- VPC ---
+#
+# BRMS validates its license over the internet, so the tasks need egress.
+#
+# create_vpc = false (default): deploy into a VPC you already have. Your network
+#   provides the egress. The module creates nothing in a public subnet. This is
+#   the path when policy forbids public-subnet resources.
+# create_vpc = true: the module builds the VPC with a NAT for egress. The public
+#   subnets it creates host only the NAT. The ALBs stay internal.
+create_vpc = false
+
+# Existing VPC inputs. Required when create_vpc = false.
+vpc_id             = "vpc-0123456789abcdef0"
+private_subnet_ids = ["subnet-private-1a", "subnet-private-1b"]
+
+# Public subnets are not used by internal ALBs. Leave empty.
+public_subnet_ids = []
+
+# Used only when create_vpc = true.
+# vpc_cidr         = "10.0.0.0/16"
+# nat_gateway_mode = "single" # "single" or "ha"
+
+# --- Container images ---
+#
+# The defaults pull from Docker Hub, which works when the tasks have internet
+# egress. If your egress is locked down to specific hosts, mirror the images to
+# ECR and set the URIs here instead.
+brms_image  = "gorules/brms:latest"
+agent_image = "gorules/agent:latest"
+
+# --- BRMS (internal ALB) ---
+
+brms_cpu       = 512
+brms_memory    = 1024
+brms_min_count = 1
+brms_max_count = 4
+
+# Internal hostname for BRMS. It must resolve to the ALB private IPs for clients
+# inside the network. Create the record in a private hosted zone or your
+# corporate DNS pointing at the brms_alb_dns_name output.
+brms_domain = "brms.internal.example.com"
+
+# Certificate ARN for the BRMS domain, in this region. For a private-only domain
+# use AWS Private CA or import your own certificate.
+brms_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+# Ranges allowed to reach the internal ALB.
+brms_allowed_cidr_blocks = ["10.0.0.0/8"]
+
+# Set to false for testing. Use true for production.
+brms_alb_deletion_protection = false
+
+# --- Agent (internal ALB) ---
+
+agent_cpu       = 256
+agent_memory    = 512
+agent_min_count = 1
+agent_max_count = 10
+
+# Leave agent_domain unset to serve HTTP inside the VPC. To terminate HTTPS on
+# the internal ALB, set both values below.
+# agent_domain          = "agent.internal.example.com"
+# agent_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+
+agent_allowed_cidr_blocks = ["10.0.0.0/8"]
+
+# Set to false for testing. Use true for production.
+agent_alb_deletion_protection = false
+
+# --- Tags ---
+
+tags = {
+  Owner       = "platform-team"
+  Application = "gorules"
+}
+
+# --- Storage ---
+
+storage_auth = "iam"
+
+# --- Database ---
+
+database_engine_version = "17.4"
+database_instance_count = 1
+database_min_capacity   = 0.5
+database_max_capacity   = 4
+
+# Auto-pause after inactivity (seconds, null to disable).
+# Requires database_min_capacity = 0 to work.
+database_seconds_until_auto_pause = null
+
+# Set to false for testing. Use true for production.
+database_deletion_protection     = false
+database_backup_retention_period = 7

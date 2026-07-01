@@ -211,7 +211,7 @@ brms_ai_model              = "claude-sonnet-4-6"
 brms_ai_api_key_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:anthropic-api-key-AbCdEf"
 ```
 
-Amazon Bedrock doesn't require an API key — it uses IAM authentication instead.
+Amazon Bedrock doesn't require an API key. It uses IAM authentication instead.
 
 See the [full-stack example](../full-stack/README.md#aillm-configuration-optional) for detailed setup instructions and all available variables.
 

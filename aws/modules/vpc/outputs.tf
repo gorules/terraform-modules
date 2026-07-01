@@ -18,7 +18,7 @@ output "private_subnet_ids" {
 }
 
 output "public_subnet_ids" {
-  description = "List of public subnet IDs"
+  description = "List of public subnet IDs (empty when the VPC is fully private)"
   value       = aws_subnet.public[*].id
 }
 
@@ -35,20 +35,20 @@ output "public_subnet_cidr_blocks" {
 # NAT Gateway Outputs
 
 output "nat_gateway_ids" {
-  description = "List of NAT Gateway IDs"
+  description = "List of NAT Gateway IDs (empty when nat_gateway_mode = none)"
   value       = aws_nat_gateway.this[*].id
 }
 
 output "nat_gateway_public_ips" {
-  description = "List of public IPs associated with NAT Gateways"
+  description = "List of public IPs associated with NAT Gateways (empty when nat_gateway_mode = none)"
   value       = aws_eip.nat[*].public_ip
 }
 
 # Route Table Outputs
 
 output "public_route_table_id" {
-  description = "ID of the public route table"
-  value       = aws_route_table.public.id
+  description = "ID of the public route table (null when the VPC has no public subnets)"
+  value       = one(aws_route_table.public[*].id)
 }
 
 output "private_route_table_ids" {
@@ -59,18 +59,23 @@ output "private_route_table_ids" {
 # VPC Endpoint Outputs
 
 output "vpc_endpoint_s3_id" {
-  description = "ID of the S3 VPC endpoint"
-  value       = var.enable_vpc_endpoints ? aws_vpc_endpoint.s3[0].id : null
+  description = "ID of the S3 VPC endpoint (null when endpoints are not created)"
+  value       = local.create_endpoints ? aws_vpc_endpoint.s3[0].id : null
+}
+
+output "vpc_endpoint_interface_ids" {
+  description = "Map of interface VPC endpoint service short-name to endpoint ID"
+  value       = { for k, ep in aws_vpc_endpoint.interface : k => ep.id }
 }
 
 output "vpc_endpoints_security_group_id" {
-  description = "ID of the security group for VPC endpoints"
-  value       = var.enable_vpc_endpoints ? aws_security_group.vpc_endpoints[0].id : null
+  description = "ID of the security group for VPC endpoints (null when endpoints are not created)"
+  value       = local.create_endpoints ? aws_security_group.vpc_endpoints[0].id : null
 }
 
 # Internet Gateway Output
 
 output "internet_gateway_id" {
-  description = "ID of the Internet Gateway"
-  value       = aws_internet_gateway.this.id
+  description = "ID of the Internet Gateway (null when the VPC has no public subnets)"
+  value       = one(aws_internet_gateway.this[*].id)
 }

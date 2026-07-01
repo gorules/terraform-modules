@@ -27,7 +27,7 @@ resource "aws_security_group_rule" "brms_alb_http_ingress" {
 }
 
 resource "aws_security_group_rule" "brms_alb_https_ingress" {
-  count = local.create_brms ? 1 : 0
+  count = local.create_brms && local.brms_use_tls ? 1 : 0
 
   type              = "ingress"
   description       = "HTTPS access from allowed CIDR blocks"
@@ -119,7 +119,7 @@ resource "aws_security_group_rule" "agent_alb_http_ingress" {
 }
 
 resource "aws_security_group_rule" "agent_alb_https_ingress" {
-  count = local.create_agent && local.agent_certificate_arn != null ? 1 : 0
+  count = local.create_agent && local.agent_use_tls ? 1 : 0
 
   type              = "ingress"
   description       = "HTTPS access from allowed CIDR blocks"

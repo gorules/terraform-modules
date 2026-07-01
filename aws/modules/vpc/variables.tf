@@ -30,20 +30,32 @@ variable "availability_zones" {
 }
 
 variable "nat_gateway_mode" {
-  description = "NAT Gateway deployment mode: 'single' for cost savings or 'ha' for high availability (one per AZ)"
+  description = "NAT Gateway deployment mode: 'single' (one NAT gateway, cost savings), 'ha' (one per AZ), or 'none' (no NAT gateway and no EIP; ECS tasks reach AWS through VPC endpoints instead). With 'none' no public subnets are created unless an internet-facing ALB needs them."
   type        = string
   default     = "single"
 
   validation {
-    condition     = contains(["single", "ha"], var.nat_gateway_mode)
-    error_message = "nat_gateway_mode must be either 'single' or 'ha'"
+    condition     = contains(["single", "ha", "none"], var.nat_gateway_mode)
+    error_message = "nat_gateway_mode must be 'single', 'ha', or 'none'"
   }
 }
 
-variable "enable_vpc_endpoints" {
-  description = "Enable VPC endpoints for AWS services (S3, ECR, CloudWatch Logs, Secrets Manager, STS)"
+variable "create_public_subnets" {
+  description = "Whether public subnets (and an internet gateway) are required for an internet-facing ALB. Public subnets are also created automatically when nat_gateway_mode != 'none' to host the NAT gateway. When false and nat_gateway_mode = 'none', the VPC has no public subnets, internet gateway, NAT gateway or EIP."
   type        = bool
   default     = false
+}
+
+variable "enable_vpc_endpoints" {
+  description = "Create VPC endpoints (S3 gateway + interface endpoints for ECR, CloudWatch Logs, Secrets Manager, STS) so tasks reach AWS services privately. Endpoints are created automatically when nat_gateway_mode = 'none' because they are then the only egress path."
+  type        = bool
+  default     = false
+}
+
+variable "additional_interface_endpoints" {
+  description = "Extra interface VPC endpoint service short-names to create in addition to the base set (ecr.api, ecr.dkr, logs, secretsmanager, sts). For example [\"kms\", \"bedrock-runtime\", \"ssmmessages\"]."
+  type        = list(string)
+  default     = []
 }
 
 variable "tags" {

@@ -40,8 +40,8 @@ resource "terraform_data" "vpc_validation" {
     }
 
     precondition {
-      condition     = length(var.vpc.public_subnet_ids) >= 1
-      error_message = "When create=false, at least one public subnet ID is required."
+      condition     = !local.needs_public_subnets || length(var.vpc.public_subnet_ids) >= 1
+      error_message = "At least one public subnet is required for an internet-facing ALB. Set brms.alb_internal = true (or agent.alb_internal = true) to deploy the ALB in private subnets, or provide vpc.public_subnet_ids."
     }
   }
 }
@@ -50,12 +50,14 @@ module "vpc" {
   source = "./modules/vpc"
   count  = local.create_vpc ? 1 : 0
 
-  name_prefix          = local.name_prefix
-  cidr                 = var.vpc.cidr
-  availability_zones   = local.availability_zones
-  nat_gateway_mode     = var.vpc.nat_gateway_mode
-  enable_vpc_endpoints = var.vpc.enable_vpc_endpoints
-  tags                 = local.tags
+  name_prefix                    = local.name_prefix
+  cidr                           = var.vpc.cidr
+  availability_zones             = local.availability_zones
+  nat_gateway_mode               = var.vpc.nat_gateway_mode
+  enable_vpc_endpoints           = var.vpc.enable_vpc_endpoints
+  create_public_subnets          = local.needs_public_subnets
+  additional_interface_endpoints = local.vpc_additional_endpoints
+  tags                           = local.tags
 }
 
 module "storage" {

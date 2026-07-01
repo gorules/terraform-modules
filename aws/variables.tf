@@ -49,43 +49,31 @@ variable "alarm_sns_topic_arn" {
 # VPC Configuration
 
 variable "vpc" {
-  description = <<-EOT
-    VPC configuration. Set create=true to create a new VPC, or create=false with existing VPC details.
-
-    Options:
-    - create: Whether to create a new VPC (default: true)
-    - cidr: VPC CIDR block for new VPC (default: "10.0.0.0/16")
-    - availability_zones: List of AZs to use. Empty list uses first 2 available AZs.
-    - nat_gateway_mode: "single" for cost savings or "ha" for high availability (default: "single")
-    - enable_vpc_endpoints: Create VPC endpoints for S3, ECR, CloudWatch, Secrets Manager (default: false)
-    - id: Existing VPC ID (required if create=false)
-    - private_subnet_ids: Existing private subnet IDs (required if create=false)
-    - public_subnet_ids: Existing public subnet IDs (required if create=false)
-  EOT
+  description = "VPC configuration: create a new VPC or use an existing one. See the wiki for fields."
   type = object({
-    create               = optional(bool, true)
-    cidr                 = optional(string, "10.0.0.0/16")
-    availability_zones   = optional(list(string), [])
-    nat_gateway_mode     = optional(string, "single")
-    enable_vpc_endpoints = optional(bool, false)
-    id                   = optional(string)
-    private_subnet_ids   = optional(list(string), [])
-    public_subnet_ids    = optional(list(string), [])
+    create                   = optional(bool, true)
+    cidr                     = optional(string, "10.0.0.0/16")
+    availability_zones       = optional(list(string), [])
+    nat_gateway_mode         = optional(string, "single")
+    enable_vpc_endpoints     = optional(bool, false)
+    additional_vpc_endpoints = optional(list(string), [])
+    id                       = optional(string)
+    private_subnet_ids       = optional(list(string), [])
+    public_subnet_ids        = optional(list(string), [])
   })
   default = {}
 
   validation {
-    condition     = var.vpc == null || var.vpc.nat_gateway_mode == null || contains(["single", "ha"], var.vpc.nat_gateway_mode)
-    error_message = "nat_gateway_mode must be 'single' or 'ha'."
+    condition     = var.vpc == null || var.vpc.nat_gateway_mode == null || contains(["single", "ha", "none"], var.vpc.nat_gateway_mode)
+    error_message = "nat_gateway_mode must be 'single', 'ha', or 'none'."
   }
 
   validation {
     condition = var.vpc == null || var.vpc.create == true || (
       var.vpc.id != null &&
-      length(var.vpc.private_subnet_ids) > 0 &&
-      length(var.vpc.public_subnet_ids) > 0
+      length(var.vpc.private_subnet_ids) > 0
     )
-    error_message = "When create=false, id, private_subnet_ids, and public_subnet_ids are required."
+    error_message = "When create=false, vpc.id and at least one private_subnet_id are required. Public subnets are required only for internet-facing ALBs."
   }
 
   validation {
@@ -97,19 +85,7 @@ variable "vpc" {
 # Storage Configuration (S3)
 
 variable "storage" {
-  description = <<-EOT
-    S3 storage configuration for GoRules rules. Set to null to disable storage creation.
-
-    Options:
-    - create_bucket: Create a new S3 bucket (default: true)
-    - existing_bucket_arn: ARN of existing bucket (required if create_bucket=false)
-    - existing_bucket_name: Name of existing bucket (required if create_bucket=false)
-    - auth: Authentication method - "iam" (recommended) or "secrets" (default: "iam")
-    - versioning: Enable S3 versioning (default: true)
-    - cross_account_write_principals: IAM role ARNs for cross-account write access (default: [])
-      RECOMMENDED: Use specific IAM role ARNs for least-privilege access.
-      WARNING: Account IDs grant access to ALL principals in that account.
-  EOT
+  description = "S3 storage configuration for GoRules rules. Set to null to disable. See the wiki for fields."
   type = object({
     create_bucket                  = optional(bool, true)
     existing_bucket_arn            = optional(string)
@@ -149,23 +125,7 @@ variable "storage" {
 # Database Configuration (Aurora Serverless v2)
 
 variable "database" {
-  description = <<-EOT
-    Aurora Serverless v2 PostgreSQL configuration. Set to null to disable database creation.
-    Required when deploying BRMS component.
-
-    Options:
-    - engine_version: PostgreSQL engine version (default: "17.4")
-    - instance_count: Number of Aurora instances (default: 1)
-    - min_capacity: Minimum ACU capacity (0-256). Set to 0 to enable auto-pause.
-    - max_capacity: Maximum ACU capacity (0.5-256)
-    - seconds_until_auto_pause: Seconds before auto-pause when idle (300-86400, null to disable). Requires min_capacity = 0.
-    - master_username: Master database username (default: "gorules_admin")
-    - deletion_protection: Enable deletion protection (default: true)
-    - backup_retention_period: Backup retention period in days (default: 7)
-    - apply_immediately: Apply changes immediately vs during maintenance window (default: false)
-    - auth: Authentication method - "secrets" (password via Secrets Manager) or "iam" (IAM database auth) (default: "secrets")
-    - iam_username: Username for IAM database authentication (default: "gorules_user", only used when auth="iam")
-  EOT
+  description = "Aurora Serverless v2 PostgreSQL configuration, required for BRMS. Set to null to disable. See the wiki for fields."
   type = object({
     engine_version           = optional(string, "17.4")
     instance_count           = optional(number, 1)
@@ -225,39 +185,7 @@ variable "database" {
 # BRMS Configuration
 
 variable "brms" {
-  description = <<-EOT
-    BRMS (Business Rules Management System) configuration. Set to null to disable BRMS deployment.
-    Requires database and storage components. BRMS requires HTTPS - you must provide either
-    route53_zone_id (auto-create certificate) or certificate_arn (existing certificate).
-
-    Options:
-    - license_key_secret_arn: ARN of Secrets Manager secret containing GoRules license key (REQUIRED)
-    - image: Docker image for BRMS (default: "gorules/brms:latest")
-    - cpu: Fargate CPU units (256, 512, 1024, 2048, 4096, 8192, 16384)
-    - memory: Fargate memory in MB (must be valid for CPU)
-    - port: Container port (default: 80)
-    - min_count: Minimum number of tasks (default: 1)
-    - max_count: Maximum number of tasks
-    - cpu_target: CPU utilization target for auto-scaling (default: 60)
-    - health_check_path: Health check endpoint (default: "/api/health")
-    - domain: Custom domain name (REQUIRED for HTTPS)
-    - certificate_arn: ACM certificate ARN for HTTPS (provide this OR route53_zone_id)
-    - route53_zone_id: Route53 hosted zone ID for automatic certificate creation and DNS (provide this OR certificate_arn)
-    - allowed_cidr_blocks: CIDR blocks allowed to access ALB
-    - alb_deletion_protection: Enable ALB deletion protection (default: true)
-    - env: Additional environment variables
-    - secrets: Additional secrets from Secrets Manager
-    - external_buckets: List of external S3 buckets for cross-account deployments (default: [])
-    - ai: AI/LLM configuration for BRMS AI assistant (default: null, AI disabled)
-      - provider: LLM provider (openai, anthropic, google, amazon-bedrock, azure-openai)
-      - model: Model name or inference profile ID (e.g., us.anthropic.claude-sonnet-4-6-v1:0, us.amazon.nova-2-lite-v1:0). For amazon-bedrock, newer models require inference profile IDs with a geographic prefix (us., eu., global., etc.).
-      - api_key_secret_arn: Secrets Manager ARN for API key (not needed for amazon-bedrock)
-      - temperature: Sampling temperature 0-2 (default: 0.4)
-      - context_window: Context window in tokens (default: provider default)
-      - max_output_tokens: Max response tokens (default: 32000)
-      - thinking_level: high, medium, low (default: medium)
-      - azure_resource_name: Azure resource name (required for azure-openai)
-  EOT
+  description = "BRMS deployment configuration. Requires database and storage, and HTTPS (certificate_arn or route53_zone_id, unless alb_http_only). Set to null to disable. See the wiki for fields."
   type = object({
     license_key_secret_arn  = string
     image                   = optional(string, "gorules/brms:latest")
@@ -273,6 +201,9 @@ variable "brms" {
     route53_zone_id         = optional(string)
     allowed_cidr_blocks     = list(string)
     alb_deletion_protection = optional(bool, true)
+    alb_internal            = optional(bool, false)
+    alb_http_only           = optional(bool, false)
+    alb_idle_timeout        = optional(number, 60)
     env                     = optional(list(object({ name = string, value = string })), [])
     secrets                 = optional(list(object({ name = string, valueFrom = string })), [])
     secrets_provider = optional(object({
@@ -344,10 +275,20 @@ variable "brms" {
   }
 
   validation {
-    condition = var.brms == null || (
+    condition = var.brms == null || var.brms.alb_http_only || (
       var.brms.route53_zone_id != null || var.brms.certificate_arn != null
     )
-    error_message = "BRMS requires HTTPS. Provide either route53_zone_id (auto-create certificate) or certificate_arn (existing certificate)."
+    error_message = "BRMS requires HTTPS. Provide route53_zone_id or certificate_arn. Alternatively set alb_http_only = true when a trusted edge such as CloudFront terminates TLS."
+  }
+
+  validation {
+    condition     = var.brms == null || !var.brms.alb_http_only || var.brms.alb_internal
+    error_message = "brms.alb_http_only requires brms.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
+  }
+
+  validation {
+    condition     = var.brms == null || (var.brms.alb_idle_timeout >= 1 && var.brms.alb_idle_timeout <= 4000)
+    error_message = "brms.alb_idle_timeout must be between 1 and 4000 seconds."
   }
 
   validation {
@@ -440,28 +381,7 @@ variable "brms" {
 # Agent Configuration
 
 variable "agent" {
-  description = <<-EOT
-    GoRules Agent configuration. Set to null to disable Agent deployment.
-    Requires storage component. Agent is stateless and pulls rules from S3.
-    Agent can run HTTP-only (no domain) or HTTPS (with domain + certificate).
-
-    Options:
-    - image: Docker image for Agent (default: "gorules/agent:latest")
-    - cpu: Fargate CPU units (256, 512, 1024, 2048, 4096, 8192, 16384)
-    - memory: Fargate memory in MB (must be valid for CPU)
-    - port: Container port (default: 8080)
-    - min_count: Minimum number of tasks (default: 1)
-    - max_count: Maximum number of tasks
-    - cpu_target: CPU utilization target for auto-scaling (default: 60)
-    - health_check_path: Health check endpoint (default: "/api/health")
-    - domain: Custom domain name (optional, enables HTTPS when provided with certificate)
-    - certificate_arn: ACM certificate ARN for HTTPS (provide this OR route53_zone_id when domain is set)
-    - route53_zone_id: Route53 hosted zone ID for automatic certificate creation and DNS (provide this OR certificate_arn when domain is set)
-    - allowed_cidr_blocks: CIDR blocks allowed to access ALB
-    - alb_deletion_protection: Enable ALB deletion protection (default: true)
-    - env: Additional environment variables
-    - secrets: Additional secrets from Secrets Manager
-  EOT
+  description = "GoRules Agent deployment configuration. Stateless, requires storage. Set to null to disable. See the wiki for fields."
   type = object({
     image                   = optional(string, "gorules/agent:latest")
     cpu                     = number
@@ -476,6 +396,9 @@ variable "agent" {
     route53_zone_id         = optional(string)
     allowed_cidr_blocks     = list(string)
     alb_deletion_protection = optional(bool, true)
+    alb_internal            = optional(bool, false)
+    alb_http_only           = optional(bool, false)
+    alb_idle_timeout        = optional(number, 60)
     env                     = optional(list(object({ name = string, value = string })), [])
     secrets                 = optional(list(object({ name = string, valueFrom = string })), [])
   })
@@ -520,9 +443,19 @@ variable "agent" {
   }
 
   validation {
-    condition = var.agent == null || var.agent.domain == null || (
+    condition = var.agent == null || var.agent.alb_http_only || var.agent.domain == null || (
       var.agent.route53_zone_id != null || var.agent.certificate_arn != null
     )
-    error_message = "When agent.domain is set, provide either route53_zone_id (auto-create certificate) or certificate_arn (existing certificate)."
+    error_message = "When agent.domain is set, provide route53_zone_id or certificate_arn. Alternatively set alb_http_only = true when a trusted edge terminates TLS."
+  }
+
+  validation {
+    condition     = var.agent == null || !var.agent.alb_http_only || var.agent.alb_internal
+    error_message = "agent.alb_http_only requires agent.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
+  }
+
+  validation {
+    condition     = var.agent == null || (var.agent.alb_idle_timeout >= 1 && var.agent.alb_idle_timeout <= 4000)
+    error_message = "agent.alb_idle_timeout must be between 1 and 4000 seconds."
   }
 }

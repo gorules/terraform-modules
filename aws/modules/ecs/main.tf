@@ -2,7 +2,7 @@ data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
 data "http" "rds_ca_bundle" {
-  url = "https://truststore.pki.rds.amazonaws.com/${data.aws_region.current.id}/${data.aws_region.current.id}-bundle.pem"
+  url = "https://truststore.pki.rds.amazonaws.com/${data.aws_region.current.region}/${data.aws_region.current.region}-bundle.pem"
 }
 
 locals {
@@ -13,7 +13,7 @@ locals {
     Module = "ecs"
   })
 
-  region     = data.aws_region.current.id
+  region     = data.aws_region.current.region
   account_id = data.aws_caller_identity.current.account_id
 
   rds_ca_cert_base64 = base64encode(data.http.rds_ca_bundle.response_body)

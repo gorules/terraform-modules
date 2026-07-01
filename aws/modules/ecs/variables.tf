@@ -26,42 +26,15 @@ variable "private_subnet_ids" {
 }
 
 variable "public_subnet_ids" {
-  description = "List of public subnet IDs for Application Load Balancers"
+  description = "List of public subnet IDs for internet-facing Application Load Balancers. May be empty when every ALB uses the internal scheme (alb_internal = true)."
   type        = list(string)
-
-  validation {
-    condition     = length(var.public_subnet_ids) >= 1
-    error_message = "At least 1 public subnet is required for ALBs."
-  }
+  default     = []
 }
 
 # BRMS Configuration
 
 variable "brms" {
-  description = <<-EOT
-    BRMS (Business Rules Management System) configuration. Set to null to disable BRMS deployment.
-    BRMS requires HTTPS - you must provide either route53_zone_id (auto-create certificate) or certificate_arn.
-
-    Options:
-    - license_key_secret_arn: ARN of Secrets Manager secret containing GoRules license key (REQUIRED)
-    - image: Docker image for BRMS (default: "gorules/brms:latest")
-    - cpu: Fargate CPU units (256, 512, 1024, 2048, 4096, 8192, 16384)
-    - memory: Fargate memory in MB (must be valid for CPU)
-    - port: Container port (default: 80)
-    - min_count: Minimum number of tasks (default: 1)
-    - max_count: Maximum number of tasks
-    - cpu_target: CPU utilization target for auto-scaling (default: 60)
-    - health_check_path: Health check endpoint (default: "/api/health")
-    - health_check_grace_period: Seconds to wait before starting health checks (default: 60)
-    - domain: Custom domain name (REQUIRED for HTTPS)
-    - certificate_arn: ACM certificate ARN for HTTPS (provide this OR route53_zone_id)
-    - route53_zone_id: Route53 hosted zone ID for automatic certificate creation and DNS (provide this OR certificate_arn)
-    - allowed_cidr_blocks: CIDR blocks allowed to access ALB
-    - enable_execute_command: Enable ECS Exec for debugging (default: false)
-    - deregistration_delay: Seconds to wait before deregistering targets (default: 30)
-    - env: Additional environment variables
-    - secrets: Additional secrets from Secrets Manager
-  EOT
+  description = "BRMS deployment configuration. Set to null to disable. See the wiki for fields."
   type = object({
     license_key_secret_arn    = string
     image                     = optional(string, "gorules/brms:latest")
@@ -80,6 +53,9 @@ variable "brms" {
     enable_execute_command    = optional(bool, false)
     deregistration_delay      = optional(number, 30)
     alb_deletion_protection   = optional(bool, true)
+    alb_internal              = optional(bool, false)
+    alb_http_only             = optional(bool, false)
+    alb_idle_timeout          = optional(number, 60)
     env                       = optional(list(object({ name = string, value = string })), [])
     secrets                   = optional(list(object({ name = string, valueFrom = string })), [])
     secrets_provider = optional(object({
@@ -114,10 +90,20 @@ variable "brms" {
   }
 
   validation {
-    condition = var.brms == null || (
+    condition = var.brms == null || var.brms.alb_http_only || (
       var.brms.route53_zone_id != null || var.brms.certificate_arn != null
     )
-    error_message = "BRMS requires HTTPS. Provide either route53_zone_id (auto-create certificate) or certificate_arn (existing certificate)."
+    error_message = "BRMS requires HTTPS. Provide route53_zone_id or certificate_arn. Alternatively set alb_http_only = true when a trusted edge such as CloudFront terminates TLS."
+  }
+
+  validation {
+    condition     = var.brms == null || !var.brms.alb_http_only || var.brms.alb_internal
+    error_message = "brms.alb_http_only requires brms.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
+  }
+
+  validation {
+    condition     = var.brms == null || (var.brms.alb_idle_timeout >= 1 && var.brms.alb_idle_timeout <= 4000)
+    error_message = "brms.alb_idle_timeout must be between 1 and 4000 seconds."
   }
 
   validation {
@@ -129,29 +115,7 @@ variable "brms" {
 # Agent Configuration
 
 variable "agent" {
-  description = <<-EOT
-    GoRules Agent configuration. Set to null to disable Agent deployment.
-    Agent can run HTTP-only (no domain) or HTTPS (with domain + certificate).
-
-    Options:
-    - image: Docker image for Agent (default: "gorules/agent:latest")
-    - cpu: Fargate CPU units (256, 512, 1024, 2048, 4096, 8192, 16384)
-    - memory: Fargate memory in MB (must be valid for CPU)
-    - port: Container port (default: 8080)
-    - min_count: Minimum number of tasks (default: 1)
-    - max_count: Maximum number of tasks
-    - cpu_target: CPU utilization target for auto-scaling (default: 60)
-    - health_check_path: Health check endpoint (default: "/api/health")
-    - health_check_grace_period: Seconds to wait before starting health checks (default: 60)
-    - domain: Custom domain name (optional, enables HTTPS when provided with certificate)
-    - certificate_arn: ACM certificate ARN for HTTPS (provide this OR route53_zone_id when domain is set)
-    - route53_zone_id: Route53 hosted zone ID for automatic certificate creation and DNS (provide this OR certificate_arn when domain is set)
-    - allowed_cidr_blocks: CIDR blocks allowed to access ALB
-    - enable_execute_command: Enable ECS Exec for debugging (default: false)
-    - deregistration_delay: Seconds to wait before deregistering targets (default: 30)
-    - env: Additional environment variables
-    - secrets: Additional secrets from Secrets Manager
-  EOT
+  description = "GoRules Agent deployment configuration. Set to null to disable. See the wiki for fields."
   type = object({
     image                     = optional(string, "gorules/agent:latest")
     cpu                       = number
@@ -169,6 +133,9 @@ variable "agent" {
     enable_execute_command    = optional(bool, false)
     deregistration_delay      = optional(number, 30)
     alb_deletion_protection   = optional(bool, true)
+    alb_internal              = optional(bool, false)
+    alb_http_only             = optional(bool, false)
+    alb_idle_timeout          = optional(number, 60)
     env                       = optional(list(object({ name = string, value = string })), [])
     secrets                   = optional(list(object({ name = string, valueFrom = string })), [])
   })
@@ -185,30 +152,27 @@ variable "agent" {
   }
 
   validation {
-    condition = var.agent == null || var.agent.domain == null || (
+    condition = var.agent == null || var.agent.alb_http_only || var.agent.domain == null || (
       var.agent.route53_zone_id != null || var.agent.certificate_arn != null
     )
-    error_message = "When agent.domain is set, provide either route53_zone_id (auto-create certificate) or certificate_arn (existing certificate)."
+    error_message = "When agent.domain is set, provide route53_zone_id or certificate_arn. Alternatively set alb_http_only = true when a trusted edge terminates TLS."
+  }
+
+  validation {
+    condition     = var.agent == null || !var.agent.alb_http_only || var.agent.alb_internal
+    error_message = "agent.alb_http_only requires agent.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
+  }
+
+  validation {
+    condition     = var.agent == null || (var.agent.alb_idle_timeout >= 1 && var.agent.alb_idle_timeout <= 4000)
+    error_message = "agent.alb_idle_timeout must be between 1 and 4000 seconds."
   }
 }
 
 # Database Configuration (for BRMS)
 
 variable "database" {
-  description = <<-EOT
-    Database configuration for BRMS. Required when brms is enabled.
-
-    Options:
-    - endpoint: Aurora cluster endpoint
-    - port: Database port (default: 5432)
-    - name: Database name
-    - username: Database username
-    - credentials_secret_arn: ARN of Secrets Manager secret with DB credentials (required for auth='secrets')
-    - secrets_read_policy_arn: ARN of IAM policy for reading DB credentials (required for auth='secrets')
-    - ssl_verify: Verify SSL certificate using AWS RDS CA bundle (default: true). Set to false to disable certificate verification.
-    - auth: Authentication method - 'secrets' (password) or 'iam' (IAM database auth) (default: 'secrets')
-    - rds_iam_connect_policy_arn: ARN of IAM policy for rds-db:connect (required for auth='iam')
-  EOT
+  description = "Database connection details passed to BRMS. See the wiki for fields."
   type = object({
     endpoint                   = string
     port                       = optional(number, 5432)
@@ -226,15 +190,7 @@ variable "database" {
 # Storage Configuration
 
 variable "storage" {
-  description = <<-EOT
-    S3 storage configuration for GoRules rules.
-
-    Options:
-    - bucket_name: Name of the S3 bucket
-    - bucket_arn: ARN of the S3 bucket
-    - iam_policy_arn: ARN of IAM policy for full S3 access (for BRMS)
-    - iam_read_only_policy_arn: ARN of IAM policy for read-only S3 access (for Agent)
-  EOT
+  description = "S3 storage details passed to the tasks. See the wiki for fields."
   type = object({
     bucket_name              = string
     bucket_arn               = string
