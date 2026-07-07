@@ -38,6 +38,17 @@ variable "tags" {
   default     = {}
 }
 
+variable "secret_recovery_window_in_days" {
+  description = "Recovery window before Secrets Manager permanently deletes secrets. 0 deletes immediately, otherwise 7 to 30."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.secret_recovery_window_in_days == 0 || (var.secret_recovery_window_in_days >= 7 && var.secret_recovery_window_in_days <= 30)
+    error_message = "secret_recovery_window_in_days must be 0 or between 7 and 30 days."
+  }
+}
+
 # Monitoring Configuration
 
 variable "alarm_sns_topic_arn" {

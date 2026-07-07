@@ -138,6 +138,12 @@ variable "performance_insights_retention_period" {
   }
 }
 
+variable "secret_recovery_window_in_days" {
+  description = "Recovery window before Secrets Manager permanently deletes secrets (0 for immediate delete)"
+  type        = number
+  default     = 30
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)

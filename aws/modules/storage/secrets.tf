@@ -22,8 +22,9 @@ resource "aws_iam_access_key" "s3_access" {
 resource "aws_secretsmanager_secret" "s3_credentials" {
   count = local.use_secrets ? 1 : 0
 
-  name        = "${var.name_prefix}-s3-credentials"
-  description = "S3 access credentials for GoRules"
+  name                    = "${var.name_prefix}-s3-credentials"
+  description             = "S3 access credentials for GoRules"
+  recovery_window_in_days = var.secret_recovery_window_in_days
 
   tags = local.common_tags
 }

@@ -327,6 +327,29 @@ brms = {
 }
 ```
 
+## Secret recovery window
+
+The module stores several values in Secrets Manager (Aurora credentials, the S3
+credentials, the BRMS cookie secret, the BRMS master key). Each uses a recovery
+window controlled by `secret_recovery_window_in_days`, which defaults to 30.
+
+With the default, a destroy does not remove these secrets right away. AWS
+schedules them for deletion and keeps the name reserved for the length of the
+window. A stack destroyed and recreated under the same name fails until the
+window passes, because the old secret name is not yet free.
+
+Set `secret_recovery_window_in_days = 0` for ephemeral or sandbox deployments to
+delete the secrets immediately, so you can destroy and recreate a stack under the
+same name without waiting. Valid values are 0 or 7 to 30.
+
+> [!CAUTION]
+> With `secret_recovery_window_in_days = 0` the immediate deletion also applies
+> to the BRMS master key. A destroy then permanently loses the ability to decrypt
+> BRMS secrets held in any retained database snapshot. See
+> [BRMS Secrets Provider](#brms-secrets-provider) for the wider warning about
+> deleting encryption keys. Keep the default, or a value between 7 and 30, for any
+> deployment whose data you might restore later.
+
 ## AI/LLM Configuration
 
 BRMS has an optional AI assistant that helps users build and edit rules. To enable it, configure the `brms.ai` block with your LLM provider.

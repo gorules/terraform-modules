@@ -222,6 +222,12 @@ variable "log_retention_days" {
   }
 }
 
+variable "secret_recovery_window_in_days" {
+  description = "Recovery window before Secrets Manager permanently deletes secrets (0 for immediate delete)"
+  type        = number
+  default     = 30
+}
+
 # Tags
 
 variable "tags" {
