@@ -218,12 +218,13 @@ variable "brms" {
     env                     = optional(list(object({ name = string, value = string })), [])
     secrets                 = optional(list(object({ name = string, valueFrom = string })), [])
     secrets_provider = optional(object({
-      type                = optional(string, "env")
-      master_key_length   = optional(number, 64)
-      create_kms_key      = optional(bool, true)
-      kms_key_arn         = optional(string)
-      kms_key_alias       = optional(string)
-      kms_deletion_window = optional(number, 30)
+      type                               = optional(string, "env")
+      master_key_length                  = optional(number, 64)
+      master_key_recovery_window_in_days = optional(number)
+      create_kms_key                     = optional(bool, true)
+      kms_key_arn                        = optional(string)
+      kms_key_alias                      = optional(string)
+      kms_deletion_window                = optional(number, 30)
     }), { type = "env" })
     external_buckets = optional(list(object({
       arn  = string
@@ -325,6 +326,11 @@ variable "brms" {
   validation {
     condition     = var.brms == null || (var.brms.secrets_provider.kms_deletion_window >= 7 && var.brms.secrets_provider.kms_deletion_window <= 30)
     error_message = "brms.secrets_provider.kms_deletion_window must be between 7 and 30 days."
+  }
+
+  validation {
+    condition     = var.brms == null || var.brms.secrets_provider.master_key_recovery_window_in_days == null || var.brms.secrets_provider.master_key_recovery_window_in_days == 0 || (var.brms.secrets_provider.master_key_recovery_window_in_days >= 7 && var.brms.secrets_provider.master_key_recovery_window_in_days <= 30)
+    error_message = "brms.secrets_provider.master_key_recovery_window_in_days must be 0 or between 7 and 30 days when set."
   }
 
   validation {

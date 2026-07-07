@@ -59,12 +59,13 @@ variable "brms" {
     env                       = optional(list(object({ name = string, value = string })), [])
     secrets                   = optional(list(object({ name = string, valueFrom = string })), [])
     secrets_provider = optional(object({
-      type                = optional(string, "env") # "env" or "aws-kms"
-      master_key_length   = optional(number, 64)    # Min 32, for env provider
-      create_kms_key      = optional(bool, true)    # Create new or use existing
-      kms_key_arn         = optional(string)        # Required if create_kms_key=false
-      kms_key_alias       = optional(string)        # Optional alias for created key
-      kms_deletion_window = optional(number, 30)    # 7-30 days
+      type                               = optional(string, "env") # "env" or "aws-kms"
+      master_key_length                  = optional(number, 64)    # Min 32, for env provider
+      master_key_recovery_window_in_days = optional(number)
+      create_kms_key                     = optional(bool, true) # Create new or use existing
+      kms_key_arn                        = optional(string)     # Required if create_kms_key=false
+      kms_key_alias                      = optional(string)     # Optional alias for created key
+      kms_deletion_window                = optional(number, 30) # 7-30 days
     }), { type = "env" })
     ai = optional(object({
       provider            = string

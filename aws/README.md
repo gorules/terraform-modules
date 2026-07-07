@@ -342,13 +342,19 @@ Set `secret_recovery_window_in_days = 0` for ephemeral or sandbox deployments to
 delete the secrets immediately, so you can destroy and recreate a stack under the
 same name without waiting. Valid values are 0 or 7 to 30.
 
+The BRMS master key can keep its own window through
+`brms.secrets_provider.master_key_recovery_window_in_days`. Leave it unset to
+follow the global value. Set it when a sandbox runs with 0 globally but the
+master key should still keep a recovery window, for example 7.
+
 > [!CAUTION]
-> With `secret_recovery_window_in_days = 0` the immediate deletion also applies
-> to the BRMS master key. A destroy then permanently loses the ability to decrypt
-> BRMS secrets held in any retained database snapshot. See
-> [BRMS Secrets Provider](#brms-secrets-provider) for the wider warning about
-> deleting encryption keys. Keep the default, or a value between 7 and 30, for any
-> deployment whose data you might restore later.
+> When `secret_recovery_window_in_days = 0` and the master key has no override,
+> the immediate deletion also applies to the BRMS master key. A destroy then
+> permanently loses the ability to decrypt BRMS secrets held in any retained
+> database snapshot. See [BRMS Secrets Provider](#brms-secrets-provider) for the
+> wider warning about deleting encryption keys. Keep a value between 7 and 30 on
+> the master key, through the global setting or the override, for any deployment
+> whose data you might restore later.
 
 ## AI/LLM Configuration
 

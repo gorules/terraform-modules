@@ -48,7 +48,7 @@ resource "aws_secretsmanager_secret" "secrets_master_key" {
 
   name                    = "${var.name_prefix}-brms-secrets-master-key"
   description             = "Auto-generated master key for BRMS secrets encryption (env provider) - DO NOT DELETE"
-  recovery_window_in_days = var.secret_recovery_window_in_days
+  recovery_window_in_days = coalesce(var.brms.secrets_provider.master_key_recovery_window_in_days, var.secret_recovery_window_in_days)
 
   tags = merge(local.common_tags, {
     Name     = "${var.name_prefix}-brms-secrets-master-key"
