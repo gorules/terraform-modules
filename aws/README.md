@@ -347,6 +347,23 @@ The BRMS master key can keep its own window through
 follow the global value. Set it when a sandbox runs with 0 globally but the
 master key should still keep a recovery window, for example 7.
 
+If a stack was already destroyed with a recovery window in place, the next apply
+fails with `InvalidRequestException: You can't create this secret because a
+secret with this name is already scheduled for deletion.` Either wait out the
+window or force delete the pending secrets:
+
+```bash
+aws secretsmanager list-secrets --include-planned-deletion \
+  --query "SecretList[?DeletedDate!=null].Name"
+
+aws secretsmanager delete-secret \
+  --secret-id <secret-name> \
+  --force-delete-without-recovery
+```
+
+Force deletion is permanent. Check the list before deleting, in particular the
+BRMS master key secret.
+
 > [!CAUTION]
 > When `secret_recovery_window_in_days = 0` and the master key has no override,
 > the immediate deletion also applies to the BRMS master key. A destroy then
