@@ -302,3 +302,5 @@ terraform destroy
 ```
 
 Note: This only destroys GoRules resources. Your existing VPC and subnets are not affected.
+
+Secrets Manager keeps destroyed secrets reserved for 30 days by default, which blocks recreating the stack under the same name. For clean destroy and recreate cycles, set `secret_recovery_window_in_days = 0` in the module block. See [Secret recovery window](../../README.md#secret-recovery-window).
