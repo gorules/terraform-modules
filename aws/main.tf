@@ -67,6 +67,7 @@ module "storage" {
   name_prefix                    = local.name_prefix
   storage                        = var.storage
   cross_account_write_principals = coalesce(var.storage.cross_account_write_principals, [])
+  secret_recovery_window_in_days = var.secret_recovery_window_in_days
   tags                           = local.tags
 }
 
@@ -74,23 +75,24 @@ module "database" {
   source = "./modules/database"
   count  = local.create_database ? 1 : 0
 
-  name_prefix                = local.name_prefix
-  vpc_id                     = local.vpc_id
-  private_subnet_ids         = local.private_subnet_ids
-  engine_version             = var.database.engine_version
-  instance_count             = var.database.instance_count
-  min_capacity               = var.database.min_capacity
-  max_capacity               = var.database.max_capacity
-  seconds_until_auto_pause   = var.database.seconds_until_auto_pause
-  master_username            = var.database.master_username
-  database_name              = local.database_name
-  deletion_protection        = var.database.deletion_protection
-  backup_retention_period    = var.database.backup_retention_period
-  apply_immediately          = var.database.apply_immediately
-  allowed_security_group_ids = []
-  auth                       = var.database.auth
-  iam_username               = var.database.iam_username
-  tags                       = local.tags
+  name_prefix                    = local.name_prefix
+  vpc_id                         = local.vpc_id
+  private_subnet_ids             = local.private_subnet_ids
+  engine_version                 = var.database.engine_version
+  instance_count                 = var.database.instance_count
+  min_capacity                   = var.database.min_capacity
+  max_capacity                   = var.database.max_capacity
+  seconds_until_auto_pause       = var.database.seconds_until_auto_pause
+  master_username                = var.database.master_username
+  database_name                  = local.database_name
+  deletion_protection            = var.database.deletion_protection
+  backup_retention_period        = var.database.backup_retention_period
+  apply_immediately              = var.database.apply_immediately
+  allowed_security_group_ids     = []
+  auth                           = var.database.auth
+  iam_username                   = var.database.iam_username
+  secret_recovery_window_in_days = var.secret_recovery_window_in_days
+  tags                           = local.tags
 
   depends_on = [module.vpc]
 }
@@ -128,6 +130,8 @@ module "ecs" {
   } : null
 
   brms_external_buckets = var.brms != null ? coalesce(var.brms.external_buckets, []) : []
+
+  secret_recovery_window_in_days = var.secret_recovery_window_in_days
 
   tags = local.tags
 

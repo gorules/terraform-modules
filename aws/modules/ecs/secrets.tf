@@ -9,8 +9,9 @@ resource "random_password" "cookie_secret" {
 resource "aws_secretsmanager_secret" "cookie_secret" {
   count = local.create_brms ? 1 : 0
 
-  name        = "${var.name_prefix}-brms-cookie-secret"
-  description = "Auto-generated cookie secret for BRMS session management"
+  name                    = "${var.name_prefix}-brms-cookie-secret"
+  description             = "Auto-generated cookie secret for BRMS session management"
+  recovery_window_in_days = var.secret_recovery_window_in_days
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-brms-cookie-secret"
@@ -47,7 +48,7 @@ resource "aws_secretsmanager_secret" "secrets_master_key" {
 
   name                    = "${var.name_prefix}-brms-secrets-master-key"
   description             = "Auto-generated master key for BRMS secrets encryption (env provider) - DO NOT DELETE"
-  recovery_window_in_days = 30
+  recovery_window_in_days = coalesce(var.brms.secrets_provider.master_key_recovery_window_in_days, var.secret_recovery_window_in_days)
 
   tags = merge(local.common_tags, {
     Name     = "${var.name_prefix}-brms-secrets-master-key"

@@ -1,6 +1,7 @@
 resource "aws_secretsmanager_secret" "credentials" {
-  name        = "${var.name_prefix}-aurora-credentials"
-  description = "Credentials for Aurora Serverless v2 PostgreSQL cluster"
+  name                    = "${var.name_prefix}-aurora-credentials"
+  description             = "Credentials for Aurora Serverless v2 PostgreSQL cluster"
+  recovery_window_in_days = var.secret_recovery_window_in_days
 
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-aurora-credentials"

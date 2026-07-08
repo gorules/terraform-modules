@@ -327,6 +327,52 @@ brms = {
 }
 ```
 
+## Secret recovery window
+
+The module stores several values in Secrets Manager (Aurora credentials, the S3
+credentials, the BRMS cookie secret, the BRMS master key). Each uses a recovery
+window controlled by `secret_recovery_window_in_days`, which defaults to 30.
+
+With the default, a destroy does not remove these secrets right away. AWS
+schedules them for deletion and keeps the name reserved for the length of the
+window. A stack destroyed and recreated under the same name fails until the
+window passes, because the old secret name is not yet free.
+
+Set `secret_recovery_window_in_days = 0` for ephemeral or sandbox deployments to
+delete the secrets immediately, so you can destroy and recreate a stack under the
+same name without waiting. Valid values are 0 or 7 to 30.
+
+The BRMS master key can keep its own window through
+`brms.secrets_provider.master_key_recovery_window_in_days`. Leave it unset to
+follow the global value. Set it when a sandbox runs with 0 globally but the
+master key should still keep a recovery window, for example 7.
+
+If a stack was already destroyed with a recovery window in place, the next apply
+fails with `InvalidRequestException: You can't create this secret because a
+secret with this name is already scheduled for deletion.` Either wait out the
+window or force delete the pending secrets:
+
+```bash
+aws secretsmanager list-secrets --include-planned-deletion \
+  --query "SecretList[?DeletedDate!=null].Name"
+
+aws secretsmanager delete-secret \
+  --secret-id <secret-name> \
+  --force-delete-without-recovery
+```
+
+Force deletion is permanent. Check the list before deleting, in particular the
+BRMS master key secret.
+
+> [!CAUTION]
+> When `secret_recovery_window_in_days = 0` and the master key has no override,
+> the immediate deletion also applies to the BRMS master key. A destroy then
+> permanently loses the ability to decrypt BRMS secrets held in any retained
+> database snapshot. See [BRMS Secrets Provider](#brms-secrets-provider) for the
+> wider warning about deleting encryption keys. Keep a value between 7 and 30 on
+> the master key, through the global setting or the override, for any deployment
+> whose data you might restore later.
+
 ## AI/LLM Configuration
 
 BRMS has an optional AI assistant that helps users build and edit rules. To enable it, configure the `brms.ai` block with your LLM provider.

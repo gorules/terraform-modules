@@ -59,12 +59,13 @@ variable "brms" {
     env                       = optional(list(object({ name = string, value = string })), [])
     secrets                   = optional(list(object({ name = string, valueFrom = string })), [])
     secrets_provider = optional(object({
-      type                = optional(string, "env") # "env" or "aws-kms"
-      master_key_length   = optional(number, 64)    # Min 32, for env provider
-      create_kms_key      = optional(bool, true)    # Create new or use existing
-      kms_key_arn         = optional(string)        # Required if create_kms_key=false
-      kms_key_alias       = optional(string)        # Optional alias for created key
-      kms_deletion_window = optional(number, 30)    # 7-30 days
+      type                               = optional(string, "env") # "env" or "aws-kms"
+      master_key_length                  = optional(number, 64)    # Min 32, for env provider
+      master_key_recovery_window_in_days = optional(number)
+      create_kms_key                     = optional(bool, true) # Create new or use existing
+      kms_key_arn                        = optional(string)     # Required if create_kms_key=false
+      kms_key_alias                      = optional(string)     # Optional alias for created key
+      kms_deletion_window                = optional(number, 30) # 7-30 days
     }), { type = "env" })
     ai = optional(object({
       provider            = string
@@ -220,6 +221,12 @@ variable "log_retention_days" {
     condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653], var.log_retention_days)
     error_message = "log_retention_days must be a valid CloudWatch Logs retention period."
   }
+}
+
+variable "secret_recovery_window_in_days" {
+  description = "Recovery window before Secrets Manager permanently deletes secrets (0 for immediate delete)"
+  type        = number
+  default     = 30
 }
 
 # Tags
