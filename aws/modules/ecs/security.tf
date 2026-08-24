@@ -91,7 +91,7 @@ resource "aws_security_group_rule" "brms_tasks_egress_all" {
 }
 
 resource "aws_security_group" "agent_alb" {
-  count = local.create_agent ? 1 : 0
+  count = local.agent_create_alb ? 1 : 0
 
   name        = "${var.name_prefix}-agent-alb-sg"
   description = "Security group for Agent Application Load Balancer"
@@ -107,7 +107,7 @@ resource "aws_security_group" "agent_alb" {
 }
 
 resource "aws_security_group_rule" "agent_alb_http_ingress" {
-  count = local.create_agent ? 1 : 0
+  count = local.agent_create_alb ? 1 : 0
 
   type              = "ingress"
   description       = "HTTP access from allowed CIDR blocks"
@@ -119,7 +119,7 @@ resource "aws_security_group_rule" "agent_alb_http_ingress" {
 }
 
 resource "aws_security_group_rule" "agent_alb_https_ingress" {
-  count = local.create_agent && local.agent_use_tls ? 1 : 0
+  count = local.agent_create_alb && local.agent_use_tls ? 1 : 0
 
   type              = "ingress"
   description       = "HTTPS access from allowed CIDR blocks"
@@ -139,7 +139,7 @@ resource "aws_security_group_rule" "agent_alb_egress_to_tasks" {
   to_port                  = var.agent.port
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.agent_tasks[0].id
-  security_group_id        = aws_security_group.agent_alb[0].id
+  security_group_id        = local.agent_alb_security_group_id
 }
 
 resource "aws_security_group" "agent_tasks" {
@@ -166,7 +166,7 @@ resource "aws_security_group_rule" "agent_tasks_ingress_from_alb" {
   from_port                = var.agent.port
   to_port                  = var.agent.port
   protocol                 = "tcp"
-  source_security_group_id = aws_security_group.agent_alb[0].id
+  source_security_group_id = local.agent_alb_security_group_id
   security_group_id        = aws_security_group.agent_tasks[0].id
 }
 

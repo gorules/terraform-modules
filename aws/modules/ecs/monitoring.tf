@@ -171,7 +171,7 @@ resource "aws_cloudwatch_metric_alarm" "agent_alb_5xx" {
   alarm_actions = var.alarm_sns_topic_arn != null ? [var.alarm_sns_topic_arn] : []
 
   dimensions = {
-    LoadBalancer = aws_lb.agent[0].arn_suffix
+    LoadBalancer = local.agent_alb_arn_suffix
     TargetGroup  = aws_lb_target_group.agent[0].arn_suffix
   }
 
@@ -197,7 +197,7 @@ resource "aws_cloudwatch_metric_alarm" "agent_unhealthy_targets" {
   alarm_actions = var.alarm_sns_topic_arn != null ? [var.alarm_sns_topic_arn] : []
 
   dimensions = {
-    LoadBalancer = aws_lb.agent[0].arn_suffix
+    LoadBalancer = local.agent_alb_arn_suffix
     TargetGroup  = aws_lb_target_group.agent[0].arn_suffix
   }
 

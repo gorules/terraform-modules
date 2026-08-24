@@ -30,6 +30,21 @@ output "agent_alb_zone_id" {
   value       = local.create_agent && local.create_ecs ? module.ecs[0].agent_alb_zone_id : null
 }
 
+output "agent_http_listener_arn" {
+  description = "The ARN of the Agent ALB HTTP listener (pass to agent.alb.listener_arn of other invocations)"
+  value       = local.create_agent && local.create_ecs ? module.ecs[0].agent_http_listener_arn : null
+}
+
+output "agent_https_listener_arn" {
+  description = "The ARN of the Agent ALB HTTPS listener (pass to agent.alb.listener_arn of other invocations)"
+  value       = local.create_agent && local.create_ecs ? module.ecs[0].agent_https_listener_arn : null
+}
+
+output "agent_alb_security_group_id" {
+  description = "The ID of the security group on the ALB serving Agent (pass to agent.alb.security_group_id of other invocations)"
+  value       = local.create_agent && local.create_ecs ? module.ecs[0].agent_alb_security_group_id : null
+}
+
 # Network Resource Outputs
 
 output "vpc_id" {

@@ -9,8 +9,54 @@ resource "aws_cloudwatch_log_group" "agent" {
   })
 }
 
+data "aws_lb_listener" "agent_external" {
+  count = local.agent_external_alb ? 1 : 0
+
+  arn = var.agent.alb.listener_arn
+}
+
+data "aws_lb" "agent_external" {
+  count = local.agent_external_alb ? 1 : 0
+
+  arn = data.aws_lb_listener.agent_external[0].load_balancer_arn
+}
+
+locals {
+  agent_alb_dns_name = (
+    local.agent_create_alb ? aws_lb.agent[0].dns_name :
+    local.agent_external_alb ? data.aws_lb.agent_external[0].dns_name :
+    null
+  )
+  agent_alb_zone_id = (
+    local.agent_create_alb ? aws_lb.agent[0].zone_id :
+    local.agent_external_alb ? data.aws_lb.agent_external[0].zone_id :
+    null
+  )
+  agent_alb_arn = (
+    local.agent_create_alb ? aws_lb.agent[0].arn :
+    local.agent_external_alb ? data.aws_lb.agent_external[0].arn :
+    null
+  )
+  agent_alb_arn_suffix = (
+    local.agent_create_alb ? aws_lb.agent[0].arn_suffix :
+    local.agent_external_alb ? data.aws_lb.agent_external[0].arn_suffix :
+    null
+  )
+  agent_alb_security_group_id = (
+    local.agent_create_alb ? aws_security_group.agent_alb[0].id :
+    local.agent_external_alb ? var.agent.alb.security_group_id :
+    null
+  )
+
+  agent_rule_host_headers = local.agent_external_alb ? coalesce(
+    var.agent.alb.host_headers,
+    var.agent.domain != null ? [var.agent.domain] : []
+  ) : []
+  agent_rule_path_patterns = local.agent_external_alb ? coalesce(var.agent.alb.path_patterns, []) : []
+}
+
 resource "aws_lb" "agent" {
-  count = local.create_agent ? 1 : 0
+  count = local.agent_create_alb ? 1 : 0
 
   name               = "${var.name_prefix}-agent-alb"
   internal           = var.agent.alb_internal
@@ -70,7 +116,7 @@ resource "aws_lb_target_group" "agent" {
 }
 
 resource "aws_lb_listener" "agent_http" {
-  count = local.create_agent ? 1 : 0
+  count = local.agent_create_alb ? 1 : 0
 
   load_balancer_arn = aws_lb.agent[0].arn
   port              = 80
@@ -93,7 +139,7 @@ resource "aws_lb_listener" "agent_http" {
 }
 
 resource "aws_lb_listener" "agent_https" {
-  count = local.create_agent && local.agent_use_tls ? 1 : 0
+  count = local.agent_create_alb && local.agent_use_tls ? 1 : 0
 
   load_balancer_arn = aws_lb.agent[0].arn
   port              = 443
@@ -105,6 +151,61 @@ resource "aws_lb_listener" "agent_https" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.agent[0].arn
   }
+
+  depends_on = [aws_acm_certificate_validation.agent]
+}
+
+resource "aws_lb_listener_rule" "agent" {
+  count = local.agent_external_alb ? 1 : 0
+
+  listener_arn = var.agent.alb.listener_arn
+  priority     = var.agent.alb.priority
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.agent[0].arn
+  }
+
+  dynamic "condition" {
+    for_each = length(local.agent_rule_host_headers) > 0 ? [1] : []
+    content {
+      host_header {
+        values = local.agent_rule_host_headers
+      }
+    }
+  }
+
+  dynamic "condition" {
+    for_each = length(local.agent_rule_path_patterns) > 0 ? [1] : []
+    content {
+      path_pattern {
+        values = local.agent_rule_path_patterns
+      }
+    }
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.name_prefix}-agent-rule"
+  })
+
+  lifecycle {
+    precondition {
+      condition     = data.aws_lb.agent_external[0].vpc_id == var.vpc_id
+      error_message = "The existing ALB (agent.alb.listener_arn) is not in the VPC the Agent tasks are deployed to."
+    }
+
+    precondition {
+      condition     = local.agent_use_tls == (data.aws_lb_listener.agent_external[0].protocol == "HTTPS")
+      error_message = "Listener protocol mismatch: for an HTTPS listener provide a certificate (agent.domain with route53_zone_id, or certificate_arn); for an HTTP listener set agent.alb_http_only = true."
+    }
+  }
+}
+
+resource "aws_lb_listener_certificate" "agent" {
+  count = local.agent_external_alb && local.agent_use_tls ? 1 : 0
+
+  listener_arn    = var.agent.alb.listener_arn
+  certificate_arn = local.agent_certificate_arn
 
   depends_on = [aws_acm_certificate_validation.agent]
 }
@@ -223,7 +324,8 @@ resource "aws_ecs_service" "agent" {
 
   depends_on = [
     aws_lb_listener.agent_http,
-    aws_lb_listener.agent_https
+    aws_lb_listener.agent_https,
+    aws_lb_listener_rule.agent
   ]
 
   lifecycle {

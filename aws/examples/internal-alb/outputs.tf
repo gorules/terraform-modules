@@ -30,6 +30,21 @@ output "agent_alb_zone_id" {
   value       = module.gorules.agent_alb_zone_id
 }
 
+output "agent_http_listener_arn" {
+  description = "The ARN of the Agent ALB HTTP listener (pass to agent.alb.listener_arn of attaching deployments)"
+  value       = module.gorules.agent_http_listener_arn
+}
+
+output "agent_https_listener_arn" {
+  description = "The ARN of the Agent ALB HTTPS listener (pass to agent.alb.listener_arn of attaching deployments)"
+  value       = module.gorules.agent_https_listener_arn
+}
+
+output "agent_alb_security_group_id" {
+  description = "The ID of the Agent ALB security group (pass to agent.alb.security_group_id of attaching deployments)"
+  value       = module.gorules.agent_alb_security_group_id
+}
+
 # Network Resources
 
 output "vpc_id" {

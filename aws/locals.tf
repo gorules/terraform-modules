@@ -22,7 +22,7 @@ locals {
   # Public subnets are only needed when an ALB uses the internet-facing scheme.
   needs_public_subnets = (
     (var.brms != null ? !var.brms.alb_internal : false) ||
-    (var.agent != null ? !var.agent.alb_internal : false)
+    (var.agent != null ? var.agent.alb.create && !var.agent.alb_internal : false)
   )
 
   # Extra interface VPC endpoints beyond the base set: kms for the aws-kms secrets provider, bedrock-runtime for Bedrock AI.
