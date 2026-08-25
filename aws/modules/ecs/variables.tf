@@ -130,15 +130,23 @@ variable "agent" {
     domain                    = optional(string)
     certificate_arn           = optional(string)
     route53_zone_id           = optional(string)
-    allowed_cidr_blocks       = list(string)
+    allowed_cidr_blocks       = optional(list(string))
     enable_execute_command    = optional(bool, false)
     deregistration_delay      = optional(number, 30)
     alb_deletion_protection   = optional(bool, true)
     alb_internal              = optional(bool, false)
     alb_http_only             = optional(bool, false)
     alb_idle_timeout          = optional(number, 60)
-    env                       = optional(list(object({ name = string, value = string })), [])
-    secrets                   = optional(list(object({ name = string, valueFrom = string })), [])
+    alb = optional(object({
+      create            = optional(bool, true)
+      listener_arn      = optional(string)
+      security_group_id = optional(string)
+      host_headers      = optional(list(string))
+      path_patterns     = optional(list(string))
+      priority          = optional(number)
+    }), {})
+    env     = optional(list(object({ name = string, value = string })), [])
+    secrets = optional(list(object({ name = string, valueFrom = string })), [])
   })
   default = null
 
@@ -160,8 +168,27 @@ variable "agent" {
   }
 
   validation {
-    condition     = var.agent == null || !var.agent.alb_http_only || var.agent.alb_internal
+    condition     = var.agent == null || !var.agent.alb.create || !var.agent.alb_http_only || var.agent.alb_internal
     error_message = "agent.alb_http_only requires agent.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
+  }
+
+  validation {
+    condition     = var.agent == null || var.agent.alb.create || (var.agent.alb.listener_arn != null && var.agent.alb.security_group_id != null)
+    error_message = "When agent.alb.create = false, both agent.alb.listener_arn and agent.alb.security_group_id are required."
+  }
+
+  validation {
+    condition = var.agent == null || var.agent.alb.create || (
+      var.agent.domain != null ||
+      (var.agent.alb.host_headers != null && length(var.agent.alb.host_headers) > 0) ||
+      (var.agent.alb.path_patterns != null && length(var.agent.alb.path_patterns) > 0)
+    )
+    error_message = "When agent.alb.create = false, provide a routing condition: agent.domain, agent.alb.host_headers, or agent.alb.path_patterns."
+  }
+
+  validation {
+    condition     = var.agent == null || !var.agent.alb.create || (var.agent.allowed_cidr_blocks != null && length(var.agent.allowed_cidr_blocks) > 0)
+    error_message = "agent.allowed_cidr_blocks must contain at least one CIDR block when the module creates the Agent ALB."
   }
 
   validation {

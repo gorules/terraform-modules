@@ -256,6 +256,58 @@ the tasks cannot pull images or read secrets, so they fail to start.
 
 See the [Internal ALB example](examples/internal-alb/).
 
+## Sharing one ALB across Agent deployments
+
+By default every invocation creates its own Agent ALB. To run multiple Agent
+deployments (per tenant, team, or business unit) behind a single ALB, one
+invocation owns the ALB and the others attach to its listener with
+`agent.alb.create = false`:
+
+```hcl
+# Owner: any regular deployment. Exposes the listener and its security group.
+output "listener_arn" { value = module.gorules.agent_https_listener_arn }
+output "alb_sg_id"    { value = module.gorules.agent_alb_security_group_id }
+
+# Each additional deployment attaches to the owner's listener.
+agent = {
+  domain          = "tenant-a.agent.example.com"
+  route53_zone_id = "Z1234567890ABC" # or certificate_arn
+
+  alb = {
+    create            = false
+    listener_arn      = "arn:aws:elasticloadbalancing:...:listener/app/..."
+    security_group_id = "sg-0123456789abcdef0"
+  }
+
+  env = [{ name = "PROVIDER__PREFIX", value = "rules/tenant-a/" }]
+  # ... other settings
+}
+```
+
+An attaching deployment skips the ALB, listeners, and ALB security group.
+Instead it creates a host-based listener rule on the shared listener (matching
+`domain`, or `agent.alb.host_headers` / `agent.alb.path_patterns` when set), an
+ACM certificate attached to the shared listener via SNI, the Route53 alias
+record, and the security group rules between the shared ALB and its tasks. Each
+deployment keeps its own domain, certificate, ECS service, autoscaling, and IAM
+role.
+
+Client access to the shared ALB is controlled by the owner's
+`allowed_cidr_blocks`. The owner-side settings (`alb_internal`, `alb_http_only`,
+`alb_deletion_protection`, `alb_idle_timeout`, `allowed_cidr_blocks`) are
+ignored when `agent.alb.create = false`, with one exception: set
+`alb_http_only = true` when attaching to an HTTP-only listener so no
+certificate is created or attached. Listener rule priorities are auto-assigned;
+pin one with `agent.alb.priority` if you need a deterministic order. An ALB
+accepts up to 25 additional SNI certificates and 100 listener rules by default.
+
+`agent.alb.host_headers` replaces `domain` as the routing condition when set.
+`agent.alb.path_patterns` without a host condition matches that path for every
+hostname on the shared listener, so on a multi-tenant ALB always pair paths
+with a host condition. Destroy attaching deployments before the owner.
+
+See the [Existing ALB example](examples/alb-existing/).
+
 ## IAM Database Authentication
 
 When using `database.auth = "iam"`, a Lambda function creates PostgreSQL users
@@ -467,6 +519,7 @@ match, otherwise the edge times out first.
 - [Full Stack](examples/full-stack/)
 - [Agent Only](examples/agent-only/)
 - [Existing VPC](examples/existing-vpc/)
+- [Existing ALB](examples/alb-existing/)
 - [Internal ALB](examples/internal-alb/)
 - [Multi-Environment](examples/multi-environment/)
 

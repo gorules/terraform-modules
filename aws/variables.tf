@@ -411,13 +411,21 @@ variable "agent" {
     domain                  = optional(string)
     certificate_arn         = optional(string)
     route53_zone_id         = optional(string)
-    allowed_cidr_blocks     = list(string)
+    allowed_cidr_blocks     = optional(list(string))
     alb_deletion_protection = optional(bool, true)
     alb_internal            = optional(bool, false)
     alb_http_only           = optional(bool, false)
     alb_idle_timeout        = optional(number, 60)
-    env                     = optional(list(object({ name = string, value = string })), [])
-    secrets                 = optional(list(object({ name = string, valueFrom = string })), [])
+    alb = optional(object({
+      create            = optional(bool, true)
+      listener_arn      = optional(string)
+      security_group_id = optional(string)
+      host_headers      = optional(list(string))
+      path_patterns     = optional(list(string))
+      priority          = optional(number)
+    }), {})
+    env     = optional(list(object({ name = string, value = string })), [])
+    secrets = optional(list(object({ name = string, valueFrom = string })), [])
   })
   default = null
 
@@ -437,8 +445,8 @@ variable "agent" {
   }
 
   validation {
-    condition     = var.agent == null || length(var.agent.allowed_cidr_blocks) > 0
-    error_message = "agent.allowed_cidr_blocks must contain at least one CIDR block."
+    condition     = var.agent == null || !var.agent.alb.create || (var.agent.allowed_cidr_blocks != null && length(var.agent.allowed_cidr_blocks) > 0)
+    error_message = "agent.allowed_cidr_blocks must contain at least one CIDR block when the module creates the Agent ALB."
   }
 
   validation {
@@ -467,12 +475,61 @@ variable "agent" {
   }
 
   validation {
-    condition     = var.agent == null || !var.agent.alb_http_only || var.agent.alb_internal
+    condition     = var.agent == null || !var.agent.alb.create || !var.agent.alb_http_only || var.agent.alb_internal
     error_message = "agent.alb_http_only requires agent.alb_internal = true. An HTTP-only ALB must be internal and sit behind a TLS-terminating edge such as CloudFront."
   }
 
   validation {
     condition     = var.agent == null || (var.agent.alb_idle_timeout >= 1 && var.agent.alb_idle_timeout <= 4000)
     error_message = "agent.alb_idle_timeout must be between 1 and 4000 seconds."
+  }
+
+  validation {
+    condition     = var.agent == null || var.agent.alb.create || (var.agent.alb.listener_arn != null && var.agent.alb.security_group_id != null)
+    error_message = "When agent.alb.create = false, both agent.alb.listener_arn and agent.alb.security_group_id are required."
+  }
+
+  validation {
+    condition = var.agent == null || var.agent.alb.create || (
+      var.agent.domain != null ||
+      (var.agent.alb.host_headers != null && length(var.agent.alb.host_headers) > 0) ||
+      (var.agent.alb.path_patterns != null && length(var.agent.alb.path_patterns) > 0)
+    )
+    error_message = "When agent.alb.create = false, provide a routing condition: agent.domain, agent.alb.host_headers, or agent.alb.path_patterns."
+  }
+
+  validation {
+    condition = var.agent == null || !var.agent.alb.create || (
+      var.agent.alb.listener_arn == null &&
+      var.agent.alb.security_group_id == null &&
+      var.agent.alb.host_headers == null &&
+      var.agent.alb.path_patterns == null &&
+      var.agent.alb.priority == null
+    )
+    error_message = "agent.alb.listener_arn, security_group_id, host_headers, path_patterns and priority are only used when agent.alb.create = false."
+  }
+
+  validation {
+    condition     = var.agent == null || var.agent.alb.listener_arn == null || can(regex("^arn:aws(-us-gov|-cn)?:elasticloadbalancing:.+:listener/", var.agent.alb.listener_arn))
+    error_message = "agent.alb.listener_arn must be a valid ALB listener ARN."
+  }
+
+  validation {
+    condition     = var.agent == null || var.agent.alb.security_group_id == null || can(regex("^sg-", var.agent.alb.security_group_id))
+    error_message = "agent.alb.security_group_id must be a valid security group ID (sg-...)."
+  }
+
+  validation {
+    condition     = var.agent == null || var.agent.alb.priority == null || (var.agent.alb.priority >= 1 && var.agent.alb.priority <= 50000)
+    error_message = "agent.alb.priority must be between 1 and 50000."
+  }
+
+  validation {
+    condition = var.agent == null || (
+      length(coalesce(var.agent.alb.host_headers, [])) <= 3 &&
+      length(coalesce(var.agent.alb.path_patterns, [])) <= 3 &&
+      length(coalesce(var.agent.alb.host_headers, [])) + length(coalesce(var.agent.alb.path_patterns, [])) <= 5
+    )
+    error_message = "ALB listener rules allow at most 3 values per condition and 5 values per rule (agent.alb.host_headers + path_patterns)."
   }
 }

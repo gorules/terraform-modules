@@ -64,23 +64,33 @@ output "agent_url" {
   value = local.create_agent ? (
     var.agent.domain != null
     ? "https://${var.agent.domain}"
-    : "http://${aws_lb.agent[0].dns_name}"
+    : "http://${local.agent_alb_dns_name}"
   ) : null
 }
 
 output "agent_alb_dns_name" {
-  description = "The DNS name of the Agent Application Load Balancer"
-  value       = local.create_agent ? aws_lb.agent[0].dns_name : null
+  description = "The DNS name of the Application Load Balancer serving Agent (created or existing)"
+  value       = local.agent_alb_dns_name
 }
 
 output "agent_alb_zone_id" {
-  description = "The zone ID of the Agent ALB (for Route53 alias records)"
-  value       = local.create_agent ? aws_lb.agent[0].zone_id : null
+  description = "The zone ID of the ALB serving Agent (for Route53 alias records)"
+  value       = local.agent_alb_zone_id
 }
 
 output "agent_alb_arn" {
-  description = "The ARN of the Agent Application Load Balancer"
-  value       = local.create_agent ? aws_lb.agent[0].arn : null
+  description = "The ARN of the Application Load Balancer serving Agent (created or existing)"
+  value       = local.agent_alb_arn
+}
+
+output "agent_http_listener_arn" {
+  description = "The ARN of the Agent ALB HTTP listener (null when using an existing ALB)"
+  value       = local.agent_create_alb ? aws_lb_listener.agent_http[0].arn : null
+}
+
+output "agent_https_listener_arn" {
+  description = "The ARN of the Agent ALB HTTPS listener (null when HTTP-only or using an existing ALB)"
+  value       = local.agent_create_alb && local.agent_use_tls ? aws_lb_listener.agent_https[0].arn : null
 }
 
 output "agent_target_group_arn" {
@@ -116,8 +126,8 @@ output "brms_tasks_security_group_id" {
 }
 
 output "agent_alb_security_group_id" {
-  description = "The ID of the Agent ALB security group"
-  value       = local.create_agent ? aws_security_group.agent_alb[0].id : null
+  description = "The ID of the security group on the ALB serving Agent (created or existing)"
+  value       = local.agent_alb_security_group_id
 }
 
 output "agent_tasks_security_group_id" {

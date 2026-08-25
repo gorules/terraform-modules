@@ -3,8 +3,9 @@ locals {
   create_agent_certificate = local.create_agent && var.agent.domain != null && var.agent.route53_zone_id != null && !var.agent.alb_http_only
 
   # TLS terminates on the ALB unless alb_http_only is set (then a trusted edge such as CloudFront terminates it).
+  # Derived from variables only so count expressions stay known at plan time.
   brms_use_tls  = var.brms != null ? !var.brms.alb_http_only : false
-  agent_use_tls = var.agent != null ? (!var.agent.alb_http_only && local.agent_certificate_arn != null) : false
+  agent_use_tls = var.agent != null ? (!var.agent.alb_http_only && (var.agent.certificate_arn != null || local.create_agent_certificate)) : false
 
   brms_certificate_arn = var.brms != null ? (
     var.brms.certificate_arn != null ? var.brms.certificate_arn :
@@ -119,8 +120,8 @@ resource "aws_route53_record" "agent_alias" {
   type    = "A"
 
   alias {
-    name                   = aws_lb.agent[0].dns_name
-    zone_id                = aws_lb.agent[0].zone_id
+    name                   = local.agent_alb_dns_name
+    zone_id                = local.agent_alb_zone_id
     evaluate_target_health = true
   }
 }

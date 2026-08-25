@@ -1,0 +1,35 @@
+# Required
+project_name = "gorules"
+environment  = "tenant-a"
+region       = "us-east-1"
+
+# Existing VPC (must be the VPC the ALB lives in)
+vpc_id             = "vpc-0123456789abcdef0"
+private_subnet_ids = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]
+
+# Existing ALB (outputs of the owning GoRules invocation)
+alb_listener_arn      = "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/gorules-prod-agent-alb/abc123/def456"
+alb_security_group_id = "sg-0123456789abcdef0"
+
+# Routing + TLS for this deployment
+agent_domain          = "tenant-a.agent.example.com"
+agent_route53_zone_id = "Z0123456789ABCDEFGHIJ"
+# agent_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
+
+# Optional: pin the listener rule priority (auto-assigned when null)
+# alb_rule_priority = 100
+
+# Agent sizing
+agent_cpu       = 256
+agent_memory    = 512
+agent_min_count = 1
+agent_max_count = 10
+
+# Per-deployment configuration
+agent_env = [
+  { name = "PROVIDER__PREFIX", value = "rules/tenant-a/" }
+]
+
+tags = {
+  Tenant = "tenant-a"
+}

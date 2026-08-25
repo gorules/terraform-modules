@@ -9,6 +9,9 @@ locals {
   create_brms  = var.brms != null
   create_agent = var.agent != null
 
+  agent_create_alb   = local.create_agent && var.agent.alb.create
+  agent_external_alb = local.create_agent && !var.agent.alb.create
+
   common_tags = merge(var.tags, {
     Module = "ecs"
   })
